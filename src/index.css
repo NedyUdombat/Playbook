@@ -1,0 +1,42 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0c0f;
+  --surface: #111418;
+  --surface2: #1a1f26;
+  --border: #252b35;
+  --border2: #2e3642;
+  --accent: #e8ff47;
+  --accent2: #b8cc2a;
+  --text: #f0f4f8;
+  --text2: #8a9ab0;
+  --text3: #4a5568;
+  --red: #ff4757;
+  --blue: #3d9eff;
+  --white: #ffffff;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  overflow: hidden;
+}
+
+button {
+  font-family: 'Barlow Condensed', sans-serif;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
