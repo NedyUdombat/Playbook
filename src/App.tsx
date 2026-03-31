@@ -1,495 +1,583 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Stroke, Player, StickyNote, Tool, PlayerTeam, LineStyle, PlayerShape, Play, MAX_PLAYS } from './types'
-import { loadPlays, savePlays } from './storage'
-import { getFieldDimensions } from './components/FieldCanvas'
-import { exportPlayToPDF } from './utils/exportPDF'
-import { newPlay } from './constants'
-import { Sidebar } from './components/Sidebar'
-import { CanvasArea } from './components/CanvasArea'
-import { ToolRail } from './components/ToolRail'
-import { PlayerContextMenu } from './components/PlayerContextMenu'
-import { TopBar } from './components/TopBar'
-import './App.css'
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { CanvasArea } from "./components/CanvasArea";
+import { getFieldDimensions } from "./components/FieldCanvas";
+import { PlayerContextMenu } from "./components/PlayerContextMenu";
+import { Sidebar } from "./components/Sidebar";
+import { ToolRail } from "./components/ToolRail";
+import { TopBar } from "./components/TopBar";
+import { newPlay } from "./constants";
+import { loadPlays, savePlays } from "./storage";
+import {
+	type LineStyle,
+	MAX_PLAYS,
+	type Play,
+	type Player,
+	type PlayerShape,
+	type PlayerTeam,
+	type StickyNote,
+	type Stroke,
+	type Tool,
+} from "./types";
+import { exportPlayToPDF } from "./utils/exportPDF";
+import "./App.css";
 
 export default function App() {
-  const [plays, setPlays] = useState<Play[]>(() => loadPlays())
-  const [activePlayId, setActivePlayId] = useState<string | null>(() => {
-    const loaded = loadPlays()
-    return loaded.length > 0 ? loaded[0].id : null
-  })
-  const [tool, setTool] = useState<Tool>('draw')
-  const [color, setColor] = useState('#caff6f')
-  const [lineWidth, setLineWidth] = useState(3)
-  const [playerTeam, setPlayerTeam] = useState<PlayerTeam>('offense')
-  const [playerLabel, setPlayerLabel] = useState('QB')
-  const [newPlayName, setNewPlayName] = useState('')
-  const [showNewPlay, setShowNewPlay] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [undoStack, setUndoStack] = useState<{ strokes: Stroke[]; players: Player[] }[]>([])
-  const [lineStyle, setLineStyle] = useState<LineStyle>('solid')
-  const [playerShape, setPlayerShape] = useState<PlayerShape>('square')
-  const [firstDownYards, setFirstDownYards] = useState(15)
-  const [noteColor, setNoteColor] = useState('yellow')
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null)
-  const [editingPlayName, setEditingPlayName] = useState(false)
-  const [tempPlayName, setTempPlayName] = useState('')
-  const [selectedEraseItems, setSelectedEraseItems] = useState<Set<string>>(new Set())
-  const canvasWrapperRef = useRef<HTMLDivElement>(null)
+	const [plays, setPlays] = useState<Play[]>(() => loadPlays());
+	const [activePlayId, setActivePlayId] = useState<string | null>(() => {
+		const loaded = loadPlays();
+		return loaded.length > 0 ? loaded[0].id : null;
+	});
+	const [tool, setTool] = useState<Tool>("draw");
+	const [color, setColor] = useState("#caff6f");
+	const [lineWidth, setLineWidth] = useState(3);
+	const [playerTeam, setPlayerTeam] = useState<PlayerTeam>("offense");
+	const [playerLabel, setPlayerLabel] = useState("QB");
+	const [newPlayName, setNewPlayName] = useState("");
+	const [showNewPlay, setShowNewPlay] = useState(false);
+	const [exporting, setExporting] = useState(false);
+	const [undoStack, setUndoStack] = useState<
+		{ strokes: Stroke[]; players: Player[] }[]
+	>([]);
+	const [lineStyle, setLineStyle] = useState<LineStyle>("solid");
+	const [playerShape, setPlayerShape] = useState<PlayerShape>("square");
+	const [firstDownYards, setFirstDownYards] = useState(15);
+	const [noteColor, setNoteColor] = useState("yellow");
+	const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+	const [contextMenuPos, setContextMenuPos] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
+	const [editingPlayName, setEditingPlayName] = useState(false);
+	const [tempPlayName, setTempPlayName] = useState("");
+	const [selectedEraseItems, setSelectedEraseItems] = useState<Set<string>>(
+		new Set(),
+	);
+	const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
-  const activePlay = plays.find((p) => p.id === activePlayId) ?? null
+	const activePlay = plays.find((p) => p.id === activePlayId) ?? null;
 
-  const persist = useCallback((updated: Play[]) => {
-    setPlays(updated)
-    savePlays(updated)
-  }, [])
+	const persist = useCallback((updated: Play[]) => {
+		setPlays(updated);
+		savePlays(updated);
+	}, []);
 
-  const updateActivePlay = useCallback(
-    (updater: (play: Play) => Play) => {
-      setPlays((prev) => {
-        const next = prev.map((p) => (p.id === activePlayId ? updater(p) : p))
-        savePlays(next)
-        return next
-      })
-    },
-    [activePlayId]
-  )
+	const updateActivePlay = useCallback(
+		(updater: (play: Play) => Play) => {
+			setPlays((prev) => {
+				const next = prev.map((p) => (p.id === activePlayId ? updater(p) : p));
+				savePlays(next);
+				return next;
+			});
+		},
+		[activePlayId],
+	);
 
-  const pushUndo = useCallback(() => {
-    if (!activePlay) return
-    setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
-  }, [activePlay])
+	const pushUndo = useCallback(() => {
+		if (!activePlay) return;
+		setUndoStack((s) => [
+			...s.slice(-20),
+			{ strokes: activePlay.strokes, players: activePlay.players },
+		]);
+	}, [activePlay]);
 
-  const handleStrokeComplete = useCallback(
-    (stroke: Stroke) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({ ...p, strokes: [...p.strokes, stroke] }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handleStrokeComplete = useCallback(
+		(stroke: Stroke) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({ ...p, strokes: [...p.strokes, stroke] }));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handlePlayerPlace = useCallback(
-    (player: Player) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({ ...p, players: [...p.players, player] }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handlePlayerPlace = useCallback(
+		(player: Player) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({ ...p, players: [...p.players, player] }));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handleEraseStroke = useCallback(
-    (id: string) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({ ...p, strokes: p.strokes.filter((s) => s.id !== id) }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handleEraseStroke = useCallback(
+		(id: string) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({
+				...p,
+				strokes: p.strokes.filter((s) => s.id !== id),
+			}));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handleErasePlayer = useCallback(
-    (id: string) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({ ...p, players: p.players.filter((pl) => pl.id !== id) }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handleErasePlayer = useCallback(
+		(id: string) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({
+				...p,
+				players: p.players.filter((pl) => pl.id !== id),
+			}));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handleUndo = useCallback(() => {
-    if (undoStack.length === 0 || !activePlay) return
-    const prev = undoStack[undoStack.length - 1]
-    setUndoStack((s) => s.slice(0, -1))
-    updateActivePlay((p) => ({ ...p, strokes: prev.strokes, players: prev.players }))
-  }, [undoStack, activePlay, updateActivePlay])
+	const handleUndo = useCallback(() => {
+		if (undoStack.length === 0 || !activePlay) return;
+		const prev = undoStack[undoStack.length - 1];
+		setUndoStack((s) => s.slice(0, -1));
+		updateActivePlay((p) => ({
+			...p,
+			strokes: prev.strokes,
+			players: prev.players,
+		}));
+	}, [undoStack, activePlay, updateActivePlay]);
 
-  const handleClear = useCallback(() => {
-    if (!activePlay) return
-    pushUndo()
-    updateActivePlay((p) => ({ ...p, strokes: [], players: [] }))
-  }, [activePlay, updateActivePlay, pushUndo])
+	const handleClear = useCallback(() => {
+		if (!activePlay) return;
+		pushUndo();
+		updateActivePlay((p) => ({ ...p, strokes: [], players: [] }));
+	}, [activePlay, updateActivePlay, pushUndo]);
 
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			if (!target.closest(".player-context-menu")) {
+				setSelectedPlayerId(null);
+				setContextMenuPos(null);
+			}
+		};
+		if (selectedPlayerId) {
+			window.addEventListener("mousedown", handleClickOutside);
+			return () => window.removeEventListener("mousedown", handleClickOutside);
+		}
+	}, [selectedPlayerId]);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (!target.closest('.player-context-menu')) {
-        setSelectedPlayerId(null)
-        setContextMenuPos(null)
-      }
-    }
-    if (selectedPlayerId) {
-      window.addEventListener('mousedown', handleClickOutside)
-      return () => window.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [selectedPlayerId])
+	const handlePlayerClick = useCallback(
+		(playerId: string, screenX: number, screenY: number) => {
+			setSelectedPlayerId(playerId);
+			setContextMenuPos({ x: screenX, y: screenY });
+		},
+		[],
+	);
 
-  const handlePlayerClick = useCallback(
-    (playerId: string, screenX: number, screenY: number) => {
-      setSelectedPlayerId(playerId)
-      setContextMenuPos({ x: screenX, y: screenY })
-    },
-    []
-  )
+	const handlePlayerUpdate = useCallback(
+		(playerId: string, updates: Partial<Player>) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({
+				...p,
+				players: p.players.map((pl) =>
+					pl.id === playerId ? { ...pl, ...updates } : pl,
+				),
+			}));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handlePlayerUpdate = useCallback(
-    (playerId: string, updates: Partial<Player>) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({
-        ...p,
-        players: p.players.map((pl) => (pl.id === playerId ? { ...pl, ...updates } : pl)),
-      }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handleStrokeUpdate = useCallback(
+		(strokeId: string, updates: Partial<Stroke>) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				strokes: p.strokes.map((s) =>
+					s.id === strokeId ? { ...s, ...updates } : s,
+				),
+			}));
+		},
+		[activePlay, updateActivePlay],
+	);
 
-  const handleStrokeUpdate = useCallback(
-    (strokeId: string, updates: Partial<Stroke>) => {
-      if (!activePlay) return
-      updateActivePlay((p) => ({
-        ...p,
-        strokes: p.strokes.map((s) => (s.id === strokeId ? { ...s, ...updates } : s)),
-      }))
-    },
-    [activePlay, updateActivePlay]
-  )
+	const handlePlayerMove = useCallback(
+		(playerId: string, x: number, y: number) => {
+			setPlays((prev) => {
+				const next = prev.map((p) =>
+					p.id === activePlayId
+						? {
+								...p,
+								players: p.players.map((pl) =>
+									pl.id === playerId ? { ...pl, x, y } : pl,
+								),
+							}
+						: p,
+				);
+				savePlays(next);
+				return next;
+			});
+		},
+		[activePlayId],
+	);
 
-  const handlePlayerMove = useCallback(
-    (playerId: string, x: number, y: number) => {
-      setPlays((prev) => {
-        const next = prev.map((p) =>
-          p.id === activePlayId
-            ? { ...p, players: p.players.map((pl) => (pl.id === playerId ? { ...pl, x, y } : pl)) }
-            : p
-        )
-        savePlays(next)
-        return next
-      })
-    },
-    [activePlayId]
-  )
+	const handleSnapMarkerPlace = useCallback(
+		(player: Player) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({ ...p, players: [...p.players, player] }));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
 
-  const handleSnapMarkerPlace = useCallback(
-    (player: Player) => {
-      if (!activePlay) return
-      pushUndo()
-      updateActivePlay((p) => ({ ...p, players: [...p.players, player] }))
-    },
-    [activePlay, updateActivePlay, pushUndo]
-  )
+	const handleNotesChange = useCallback(
+		(notes: string) => {
+			updateActivePlay((p) => ({ ...p, notes }));
+		},
+		[updateActivePlay],
+	);
 
-  const handleNotesChange = useCallback(
-    (notes: string) => {
-      updateActivePlay((p) => ({ ...p, notes }))
-    },
-    [updateActivePlay]
-  )
+	const handleUpdateFormation = useCallback(
+		(formation: string) => {
+			updateActivePlay((p) => ({ ...p, formation }));
+		},
+		[updateActivePlay],
+	);
 
-  const handleUpdateFormation = useCallback(
-    (formation: string) => {
-      updateActivePlay((p) => ({ ...p, formation }))
-    },
-    [updateActivePlay]
-  )
+	const handleUpdateSituation = useCallback(
+		(situation: string) => {
+			updateActivePlay((p) => ({ ...p, situation }));
+		},
+		[updateActivePlay],
+	);
 
-  const handleUpdateSituation = useCallback(
-    (situation: string) => {
-      updateActivePlay((p) => ({ ...p, situation }))
-    },
-    [updateActivePlay]
-  )
+	const handleStickyNoteAdd = useCallback(
+		(note: StickyNote) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				stickyNotes: [...(p.stickyNotes || []), note],
+			}));
+		},
+		[activePlay, updateActivePlay],
+	);
 
-  const handleStickyNoteAdd = useCallback(
-    (note: StickyNote) => {
-      if (!activePlay) return
-      updateActivePlay((p) => ({ ...p, stickyNotes: [...(p.stickyNotes || []), note] }))
-    },
-    [activePlay, updateActivePlay]
-  )
+	const handleStickyNoteUpdate = useCallback(
+		(id: string, updates: Partial<StickyNote>) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				stickyNotes: (p.stickyNotes || []).map((n) =>
+					n.id === id ? { ...n, ...updates } : n,
+				),
+			}));
+		},
+		[activePlay, updateActivePlay],
+	);
 
-  const handleStickyNoteUpdate = useCallback(
-    (id: string, updates: Partial<StickyNote>) => {
-      if (!activePlay) return
-      updateActivePlay((p) => ({
-        ...p,
-        stickyNotes: (p.stickyNotes || []).map((n) => (n.id === id ? { ...n, ...updates } : n)),
-      }))
-    },
-    [activePlay, updateActivePlay]
-  )
+	const handleStickyNoteDelete = useCallback(
+		(id: string) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				stickyNotes: (p.stickyNotes || []).filter((n) => n.id !== id),
+			}));
+		},
+		[activePlay, updateActivePlay],
+	);
 
-  const handleStickyNoteDelete = useCallback(
-    (id: string) => {
-      if (!activePlay) return
-      updateActivePlay((p) => ({ ...p, stickyNotes: (p.stickyNotes || []).filter((n) => n.id !== id) }))
-    },
-    [activePlay, updateActivePlay]
-  )
+	const handleStickyNoteMove = useCallback(
+		(id: string, x: number, y: number) => {
+			setPlays((prev) => {
+				const next = prev.map((p) =>
+					p.id === activePlayId
+						? {
+								...p,
+								stickyNotes: (p.stickyNotes || []).map((n) =>
+									n.id === id ? { ...n, x, y } : n,
+								),
+							}
+						: p,
+				);
+				savePlays(next);
+				return next;
+			});
+		},
+		[activePlayId],
+	);
 
-  const handleStickyNoteMove = useCallback(
-    (id: string, x: number, y: number) => {
-      setPlays((prev) => {
-        const next = prev.map((p) =>
-          p.id === activePlayId
-            ? { ...p, stickyNotes: (p.stickyNotes || []).map((n) => (n.id === id ? { ...n, x, y } : n)) }
-            : p
-        )
-        savePlays(next)
-        return next
-      })
-    },
-    [activePlayId]
-  )
+	const handleCreatePlay = useCallback(() => {
+		if (plays.length >= MAX_PLAYS) return;
+		const name = newPlayName.trim() || `Play ${plays.length + 1}`;
+		const play = newPlay(name);
+		const updated = [...plays, play];
+		persist(updated);
+		setActivePlayId(play.id);
+		setNewPlayName("");
+		setShowNewPlay(false);
+		setUndoStack([]);
+	}, [plays, newPlayName, persist]);
 
-  const handleCreatePlay = useCallback(() => {
-    if (plays.length >= MAX_PLAYS) return
-    const name = newPlayName.trim() || `Play ${plays.length + 1}`
-    const play = newPlay(name)
-    const updated = [...plays, play]
-    persist(updated)
-    setActivePlayId(play.id)
-    setNewPlayName('')
-    setShowNewPlay(false)
-    setUndoStack([])
-  }, [plays, newPlayName, persist])
+	const handleDeletePlay = useCallback(
+		(id: string) => {
+			const updated = plays.filter((p) => p.id !== id);
+			persist(updated);
+			if (activePlayId === id) {
+				setActivePlayId(updated.length > 0 ? updated[0].id : null);
+			}
+		},
+		[plays, activePlayId, persist],
+	);
 
-  const handleDeletePlay = useCallback(
-    (id: string) => {
-      const updated = plays.filter((p) => p.id !== id)
-      persist(updated)
-      if (activePlayId === id) {
-        setActivePlayId(updated.length > 0 ? updated[0].id : null)
-      }
-    },
-    [plays, activePlayId, persist]
-  )
+	const handleExport = useCallback(async () => {
+		if (!activePlay) return;
+		const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+		if (!canvas) return;
+		setExporting(true);
+		try {
+			await exportPlayToPDF(canvas, activePlay);
+		} finally {
+			setExporting(false);
+		}
+	}, [activePlay]);
 
-  const handleExport = useCallback(async () => {
-    if (!activePlay) return
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
-    if (!canvas) return
-    setExporting(true)
-    try {
-      await exportPlayToPDF(canvas, activePlay)
-    } finally {
-      setExporting(false)
-    }
-  }, [activePlay])
+	const handleSelectPlay = (id: string) => {
+		setActivePlayId(id);
+		setUndoStack([]);
+	};
 
-  const handleSelectPlay = (id: string) => {
-    setActivePlayId(id)
-    setUndoStack([])
-  }
+	const handleEraseItem = (id: string, type: "stroke" | "player") => {
+		if (type === "stroke") handleEraseStroke(id);
+		else handleErasePlayer(id);
+		setSelectedEraseItems((prev) => {
+			const next = new Set(prev);
+			next.delete(id);
+			return next;
+		});
+	};
 
-  const handleEraseItem = (id: string, type: 'stroke' | 'player') => {
-    if (type === 'stroke') handleEraseStroke(id)
-    else handleErasePlayer(id)
-    setSelectedEraseItems((prev) => { const next = new Set(prev); next.delete(id); return next })
-  }
+	const toggleEraseItemSelection = (id: string) => {
+		setSelectedEraseItems((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+	};
 
-  const toggleEraseItemSelection = (id: string) => {
-    setSelectedEraseItems((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+	const selectAllEraseItems = () => {
+		if (!activePlay) return;
+		const allIds = new Set<string>();
+		activePlay.strokes.forEach((s) => allIds.add(s.id));
+		activePlay.players.forEach((p) => allIds.add(p.id));
+		setSelectedEraseItems(allIds);
+	};
 
-  const selectAllEraseItems = () => {
-    if (!activePlay) return
-    const allIds = new Set<string>()
-    activePlay.strokes.forEach((s) => allIds.add(s.id))
-    activePlay.players.forEach((p) => allIds.add(p.id))
-    setSelectedEraseItems(allIds)
-  }
+	const deleteSelectedItems = useCallback(() => {
+		if (!activePlay) return;
+		pushUndo();
+		updateActivePlay((p) => ({
+			...p,
+			strokes: p.strokes.filter((s) => !selectedEraseItems.has(s.id)),
+			players: p.players.filter((pl) => !selectedEraseItems.has(pl.id)),
+		}));
+		setSelectedEraseItems(new Set());
+	}, [activePlay, pushUndo, updateActivePlay, selectedEraseItems]);
 
-  const deleteSelectedItems = useCallback(() => {
-    if (!activePlay) return
-    pushUndo()
-    updateActivePlay((p) => ({
-      ...p,
-      strokes: p.strokes.filter((s) => !selectedEraseItems.has(s.id)),
-      players: p.players.filter((pl) => !selectedEraseItems.has(pl.id)),
-    }))
-    setSelectedEraseItems(new Set())
-  }, [activePlay, pushUndo, updateActivePlay, selectedEraseItems])
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const target = e.target as HTMLElement;
+			const isTyping =
+				target.tagName === "INPUT" ||
+				target.tagName === "TEXTAREA" ||
+				target.isContentEditable;
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+			if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+				e.preventDefault();
+				handleUndo();
+				return;
+			}
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        handleUndo()
-        return
-      }
+			if (e.key === "Escape") {
+				setSelectedPlayerId(null);
+				setContextMenuPos(null);
+				return;
+			}
 
-      if (e.key === 'Escape') {
-        setSelectedPlayerId(null)
-        setContextMenuPos(null)
-        return
-      }
+			if (isTyping) return;
 
-      if (isTyping) return
+			// Tool shortcuts
+			if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+				switch (e.key.toLowerCase()) {
+					case "s":
+						setTool("select");
+						return;
+					case "d":
+						setTool("draw");
+						return;
+					case "p":
+						setTool("player");
+						return;
+					case "n":
+						setTool("note");
+						return;
+					case "z":
+						setTool("zone");
+						return;
+					case "e":
+						setTool("erase");
+						return;
+				}
+			}
 
-      // Tool shortcuts
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        switch (e.key.toLowerCase()) {
-          case 's': setTool('select'); return
-          case 'd': setTool('draw'); return
-          case 'p': setTool('player'); return
-          case 'n': setTool('note'); return
-          case 'z': setTool('zone'); return
-          case 'e': setTool('erase'); return
-        }
-      }
+			// Delete selected
+			if (e.key === "Backspace" || e.key === "Delete") {
+				if (selectedPlayerId) {
+					e.preventDefault();
+					handleErasePlayer(selectedPlayerId);
+					setSelectedPlayerId(null);
+					setContextMenuPos(null);
+				} else if (selectedEraseItems.size > 0) {
+					e.preventDefault();
+					deleteSelectedItems();
+				}
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [
+		handleUndo,
+		selectedPlayerId,
+		selectedEraseItems,
+		handleErasePlayer,
+		deleteSelectedItems,
+	]);
 
-      // Delete selected
-      if (e.key === 'Backspace' || e.key === 'Delete') {
-        if (selectedPlayerId) {
-          e.preventDefault()
-          handleErasePlayer(selectedPlayerId)
-          setSelectedPlayerId(null)
-          setContextMenuPos(null)
-        } else if (selectedEraseItems.size > 0) {
-          e.preventDefault()
-          deleteSelectedItems()
-        }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleUndo, selectedPlayerId, selectedEraseItems, handleErasePlayer, deleteSelectedItems])
+	const startEditingPlayName = () => {
+		if (activePlay) {
+			setTempPlayName(activePlay.name);
+			setEditingPlayName(true);
+		}
+	};
 
-  const startEditingPlayName = () => {
-    if (activePlay) {
-      setTempPlayName(activePlay.name)
-      setEditingPlayName(true)
-    }
-  }
+	const savePlayName = () => {
+		if (activePlay && tempPlayName.trim()) {
+			updateActivePlay((p) => ({ ...p, name: tempPlayName.trim() }));
+		}
+		setEditingPlayName(false);
+	};
 
-  const savePlayName = () => {
-    if (activePlay && tempPlayName.trim()) {
-      updateActivePlay((p) => ({ ...p, name: tempPlayName.trim() }))
-    }
-    setEditingPlayName(false)
-  }
+	const selectedPlayer =
+		activePlay?.players.find((p) => p.id === selectedPlayerId) ?? null;
 
-  const selectedPlayer = activePlay?.players.find((p) => p.id === selectedPlayerId) ?? null
+	const closeContextMenu = () => {
+		setSelectedPlayerId(null);
+		setContextMenuPos(null);
+	};
 
-  const closeContextMenu = () => {
-    setSelectedPlayerId(null)
-    setContextMenuPos(null)
-  }
+	return (
+		<div className="app">
+			<TopBar
+				plays={plays}
+				activePlayId={activePlayId}
+				newPlayName={newPlayName}
+				setNewPlayName={setNewPlayName}
+				showNewPlay={showNewPlay}
+				setShowNewPlay={setShowNewPlay}
+				onCreatePlay={handleCreatePlay}
+				onDeletePlay={handleDeletePlay}
+				onSelectPlay={handleSelectPlay}
+				firstDownYards={firstDownYards}
+				setFirstDownYards={setFirstDownYards}
+			/>
+			<div className="app-body">
+				<ToolRail
+					tool={tool}
+					setTool={setTool}
+					onUndo={handleUndo}
+					onClear={handleClear}
+					undoStackLength={undoStack.length}
+					hasActivePlay={activePlay !== null}
+					color={color}
+					setColor={setColor}
+					lineWidth={lineWidth}
+					setLineWidth={setLineWidth}
+					lineStyle={lineStyle}
+					setLineStyle={setLineStyle}
+					noteColor={noteColor}
+					setNoteColor={setNoteColor}
+					activePlay={activePlay}
+					selectedEraseItems={selectedEraseItems}
+					onEraseItem={handleEraseItem}
+					onToggleEraseItem={toggleEraseItemSelection}
+					onSelectAllEraseItems={selectAllEraseItems}
+					onDeleteSelectedItems={deleteSelectedItems}
+				/>
 
-  return (
-    <div className="app">
-      <TopBar
-        plays={plays}
-        activePlayId={activePlayId}
-        newPlayName={newPlayName}
-        setNewPlayName={setNewPlayName}
-        showNewPlay={showNewPlay}
-        setShowNewPlay={setShowNewPlay}
-        onCreatePlay={handleCreatePlay}
-        onDeletePlay={handleDeletePlay}
-        onSelectPlay={handleSelectPlay}
-        firstDownYards={firstDownYards}
-        setFirstDownYards={setFirstDownYards}
-      />
-      <div className="app-body">
-      <ToolRail
-        tool={tool}
-        setTool={setTool}
-        onUndo={handleUndo}
-        onClear={handleClear}
-        undoStackLength={undoStack.length}
-        hasActivePlay={activePlay !== null}
-        color={color}
-        setColor={setColor}
-        lineWidth={lineWidth}
-        setLineWidth={setLineWidth}
-        lineStyle={lineStyle}
-        setLineStyle={setLineStyle}
-        noteColor={noteColor}
-        setNoteColor={setNoteColor}
-        activePlay={activePlay}
-        selectedEraseItems={selectedEraseItems}
-        onEraseItem={handleEraseItem}
-        onToggleEraseItem={toggleEraseItemSelection}
-        onSelectAllEraseItems={selectAllEraseItems}
-        onDeleteSelectedItems={deleteSelectedItems}
-      />
+				<Sidebar
+					activePlay={activePlay}
+					onExport={handleExport}
+					exporting={exporting}
+					onUpdateFormation={handleUpdateFormation}
+					onUpdateSituation={handleUpdateSituation}
+				/>
 
-      <Sidebar
-        activePlay={activePlay}
-        onExport={handleExport}
-        exporting={exporting}
-        onUpdateFormation={handleUpdateFormation}
-        onUpdateSituation={handleUpdateSituation}
-      />
+				<main className="canvas-area ">
+					{activePlay ? (
+						<CanvasArea
+							activePlay={activePlay}
+							editingPlayName={editingPlayName}
+							tempPlayName={tempPlayName}
+							setTempPlayName={setTempPlayName}
+							onStartEditingPlayName={startEditingPlayName}
+							onSavePlayName={savePlayName}
+							onCancelEditingPlayName={() => setEditingPlayName(false)}
+							tool={tool}
+							color={color}
+							lineWidth={lineWidth}
+							lineStyle={lineStyle}
+							undoStackLength={undoStack.length}
+							onUndo={handleUndo}
+							onClear={handleClear}
+							onStrokeComplete={handleStrokeComplete}
+							onPlayerPlace={handlePlayerPlace}
+							onEraseStroke={handleEraseStroke}
+							onErasePlayer={handleErasePlayer}
+							onSnapMarkerPlace={handleSnapMarkerPlace}
+							onPlayerClick={handlePlayerClick}
+							onPlayerMove={handlePlayerMove}
+							onStrokeUpdate={handleStrokeUpdate}
+							onStickyNoteAdd={handleStickyNoteAdd}
+							onStickyNoteUpdate={handleStickyNoteUpdate}
+							onStickyNoteDelete={handleStickyNoteDelete}
+							onStickyNoteMove={handleStickyNoteMove}
+							playerTeam={playerTeam}
+							playerLabel={playerLabel}
+							playerShape={playerShape}
+							firstDownYards={firstDownYards}
+							noteColor={noteColor}
+							canvasWrapperRef={canvasWrapperRef}
+							onNotesChange={handleNotesChange}
+						/>
+					) : (
+						<div className="empty-state">
+							<div className="empty-icon">◈</div>
+							<div className="empty-title">NO PLAY SELECTED</div>
+							<div className="empty-sub">
+								Create a play in the sidebar to get started
+							</div>
+						</div>
+					)}
+				</main>
 
-      <main className="canvas-area ">
-        {activePlay ? (
-          <CanvasArea
-            activePlay={activePlay}
-            editingPlayName={editingPlayName}
-            tempPlayName={tempPlayName}
-            setTempPlayName={setTempPlayName}
-            onStartEditingPlayName={startEditingPlayName}
-            onSavePlayName={savePlayName}
-            onCancelEditingPlayName={() => setEditingPlayName(false)}
-            tool={tool}
-            color={color}
-            lineWidth={lineWidth}
-            lineStyle={lineStyle}
-            undoStackLength={undoStack.length}
-            onUndo={handleUndo}
-            onClear={handleClear}
-            onStrokeComplete={handleStrokeComplete}
-            onPlayerPlace={handlePlayerPlace}
-            onEraseStroke={handleEraseStroke}
-            onErasePlayer={handleErasePlayer}
-            onSnapMarkerPlace={handleSnapMarkerPlace}
-            onPlayerClick={handlePlayerClick}
-            onPlayerMove={handlePlayerMove}
-            onStrokeUpdate={handleStrokeUpdate}
-            onStickyNoteAdd={handleStickyNoteAdd}
-            onStickyNoteUpdate={handleStickyNoteUpdate}
-            onStickyNoteDelete={handleStickyNoteDelete}
-            onStickyNoteMove={handleStickyNoteMove}
-            playerTeam={playerTeam}
-            playerLabel={playerLabel}
-            playerShape={playerShape}
-            firstDownYards={firstDownYards}
-            noteColor={noteColor}
-            canvasWrapperRef={canvasWrapperRef}
-            onNotesChange={handleNotesChange}
-          />
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">◈</div>
-            <div className="empty-title">NO PLAY SELECTED</div>
-            <div className="empty-sub">Create a play in the sidebar to get started</div>
-          </div>
-        )}
-      </main>
-
-      {selectedPlayer && contextMenuPos && (
-        <PlayerContextMenu
-          selectedPlayer={selectedPlayer}
-          contextMenuPos={contextMenuPos}
-          onClose={closeContextMenu}
-          onChangeLabel={(label) => handlePlayerUpdate(selectedPlayer.id, { label })}
-          onChangeColor={(color) => handlePlayerUpdate(selectedPlayer.id, { color })}
-          onChangeShape={(shape) => handlePlayerUpdate(selectedPlayer.id, { shape })}
-          onDelete={() => { handleErasePlayer(selectedPlayer.id); closeContextMenu() }}
-        />
-      )}
-      </div>
-    </div>
-  )
+				{selectedPlayer && contextMenuPos && (
+					<PlayerContextMenu
+						selectedPlayer={selectedPlayer}
+						contextMenuPos={contextMenuPos}
+						onClose={closeContextMenu}
+						onChangeLabel={(label) =>
+							handlePlayerUpdate(selectedPlayer.id, { label })
+						}
+						onChangeColor={(color) =>
+							handlePlayerUpdate(selectedPlayer.id, { color })
+						}
+						onChangeShape={(shape) =>
+							handlePlayerUpdate(selectedPlayer.id, { shape })
+						}
+						onDelete={() => {
+							handleErasePlayer(selectedPlayer.id);
+							closeContextMenu();
+						}}
+					/>
+				)}
+			</div>
+		</div>
+	);
 }
