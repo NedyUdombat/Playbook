@@ -10,8 +10,8 @@ export async function exportPlayToPDF(
   const canvasW = canvasEl.width
   const canvasH = canvasEl.height
 
-  // Landscape A4
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  // Portrait A4 to match the vertical field layout
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
 
@@ -43,11 +43,51 @@ export async function exportPlayToPDF(
   })
   pdf.text(date, pageW - 10, 11, { align: 'right' })
 
+  // Play properties bar (formation / situation)
+  const hasFormation = play.formation && play.formation.trim().length > 0
+  const hasSituation = play.situation && play.situation.trim().length > 0
+  const hasProps = hasFormation || hasSituation
+  const propsBarH = hasProps ? 10 : 0
+  if (hasProps) {
+    pdf.setFillColor(17, 20, 24)
+    pdf.rect(0, 18, pageW, propsBarH, 'F')
+
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+
+    if (hasFormation) {
+      pdf.setTextColor(138, 154, 176)
+      pdf.text('FORMATION', 10, 24.5)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(240, 244, 248)
+      pdf.text(play.formation!, 10 + pdf.getTextWidth('FORMATION') + 3, 24.5)
+    }
+
+    if (hasSituation) {
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(138, 154, 176)
+      const situLabel = 'SITUATION'
+      const situLabelW = pdf.getTextWidth(situLabel)
+      const situVal = play.situation!
+      const situValW = pdf.getTextWidth(situVal)
+      const totalW = situLabelW + 3 + situValW
+      const situX = pageW - 10 - totalW
+      pdf.text(situLabel, situX, 24.5)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(240, 244, 248)
+      pdf.text(situVal, situX + situLabelW + 3, 24.5)
+    }
+  }
+
+  // Calculate space for notes if present
+  const hasNotes = play.notes && play.notes.trim().length > 0
+  const notesHeight = hasNotes ? 40 : 0 // Reserve space for notes
+
   // Field image
   const margin = 10
-  const top = 22
+  const top = 18 + propsBarH + 4
   const availW = pageW - margin * 2
-  const availH = pageH - top - margin
+  const availH = pageH - top - margin - notesHeight - 10 // Leave space for notes and footer
   const ratio = canvasW / canvasH
   let imgW = availW
   let imgH = imgW / ratio
@@ -57,6 +97,36 @@ export async function exportPlayToPDF(
   }
   const imgX = (pageW - imgW) / 2
   pdf.addImage(imgData, 'PNG', imgX, top, imgW, imgH)
+
+  // Notes section (if present)
+  if (hasNotes) {
+    const notesTop = top + imgH + 8
+
+    // Notes background
+    pdf.setFillColor(17, 20, 24)
+    pdf.roundedRect(margin, notesTop, pageW - margin * 2, notesHeight - 5, 2, 2, 'F')
+
+    // Notes label
+    pdf.setTextColor(138, 154, 176)
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('NOTES', margin + 5, notesTop + 6)
+
+    // Notes content
+    pdf.setTextColor(200, 210, 220)
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'normal')
+
+    // Split notes into lines that fit
+    const maxWidth = pageW - margin * 2 - 10
+    const lines = pdf.splitTextToSize(play.notes, maxWidth)
+    const maxLines = 3 // Limit to 3 lines
+    const displayLines = lines.slice(0, maxLines)
+    if (lines.length > maxLines) {
+      displayLines[maxLines - 1] = displayLines[maxLines - 1].slice(0, -3) + '...'
+    }
+    pdf.text(displayLines, margin + 5, notesTop + 14)
+  }
 
   // Footer
   pdf.setTextColor(74, 85, 104)

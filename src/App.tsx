@@ -1,26 +1,15 @@
-import React, { useState, useRef, useCallback } from 'react'
-import { Play, Stroke, Player, Tool, PlayerTeam, MAX_PLAYS } from './types'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { Stroke, Player, StickyNote, Tool, PlayerTeam, LineStyle, PlayerShape, Play, MAX_PLAYS } from './types'
 import { loadPlays, savePlays } from './storage'
-import { FieldCanvas } from './components/FieldCanvas'
+import { getFieldDimensions } from './components/FieldCanvas'
 import { exportPlayToPDF } from './utils/exportPDF'
+import { newPlay } from './constants'
+import { Sidebar } from './components/Sidebar'
+import { CanvasArea } from './components/CanvasArea'
+import { ToolRail } from './components/ToolRail'
+import { PlayerContextMenu } from './components/PlayerContextMenu'
+import { TopBar } from './components/TopBar'
 import './App.css'
-
-const ROUTE_COLORS = [
-  { label: 'Lime', value: '#e8ff47' },
-  { label: 'Red', value: '#ff4757' },
-  { label: 'Blue', value: '#3d9eff' },
-  { label: 'White', value: '#ffffff' },
-  { label: 'Orange', value: '#ff8c42' },
-  { label: 'Purple', value: '#c084fc' },
-]
-
-function generateId() {
-  return Math.random().toString(36).slice(2, 10)
-}
-
-function newPlay(name: string): Play {
-  return { id: generateId(), name, strokes: [], players: [], createdAt: Date.now() }
-}
 
 export default function App() {
   const [plays, setPlays] = useState<Play[]>(() => loadPlays())
@@ -29,7 +18,7 @@ export default function App() {
     return loaded.length > 0 ? loaded[0].id : null
   })
   const [tool, setTool] = useState<Tool>('draw')
-  const [color, setColor] = useState(ROUTE_COLORS[0].value)
+  const [color, setColor] = useState('#caff6f')
   const [lineWidth, setLineWidth] = useState(3)
   const [playerTeam, setPlayerTeam] = useState<PlayerTeam>('offense')
   const [playerLabel, setPlayerLabel] = useState('QB')
@@ -37,7 +26,16 @@ export default function App() {
   const [showNewPlay, setShowNewPlay] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [undoStack, setUndoStack] = useState<{ strokes: Stroke[]; players: Player[] }[]>([])
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [lineStyle, setLineStyle] = useState<LineStyle>('solid')
+  const [playerShape, setPlayerShape] = useState<PlayerShape>('square')
+  const [firstDownYards, setFirstDownYards] = useState(15)
+  const [noteColor, setNoteColor] = useState('yellow')
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null)
+  const [editingPlayName, setEditingPlayName] = useState(false)
+  const [tempPlayName, setTempPlayName] = useState('')
+  const [selectedEraseItems, setSelectedEraseItems] = useState<Set<string>>(new Set())
+  const canvasWrapperRef = useRef<HTMLDivElement>(null)
 
   const activePlay = plays.find((p) => p.id === activePlayId) ?? null
 
@@ -57,40 +55,45 @@ export default function App() {
     [activePlayId]
   )
 
+  const pushUndo = useCallback(() => {
+    if (!activePlay) return
+    setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+  }, [activePlay])
+
   const handleStrokeComplete = useCallback(
     (stroke: Stroke) => {
       if (!activePlay) return
-      setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+      pushUndo()
       updateActivePlay((p) => ({ ...p, strokes: [...p.strokes, stroke] }))
     },
-    [activePlay, updateActivePlay]
+    [activePlay, updateActivePlay, pushUndo]
   )
 
   const handlePlayerPlace = useCallback(
     (player: Player) => {
       if (!activePlay) return
-      setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+      pushUndo()
       updateActivePlay((p) => ({ ...p, players: [...p.players, player] }))
     },
-    [activePlay, updateActivePlay]
+    [activePlay, updateActivePlay, pushUndo]
   )
 
   const handleEraseStroke = useCallback(
     (id: string) => {
       if (!activePlay) return
-      setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+      pushUndo()
       updateActivePlay((p) => ({ ...p, strokes: p.strokes.filter((s) => s.id !== id) }))
     },
-    [activePlay, updateActivePlay]
+    [activePlay, updateActivePlay, pushUndo]
   )
 
   const handleErasePlayer = useCallback(
     (id: string) => {
       if (!activePlay) return
-      setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+      pushUndo()
       updateActivePlay((p) => ({ ...p, players: p.players.filter((pl) => pl.id !== id) }))
     },
-    [activePlay, updateActivePlay]
+    [activePlay, updateActivePlay, pushUndo]
   )
 
   const handleUndo = useCallback(() => {
@@ -102,9 +105,142 @@ export default function App() {
 
   const handleClear = useCallback(() => {
     if (!activePlay) return
-    setUndoStack((s) => [...s.slice(-20), { strokes: activePlay.strokes, players: activePlay.players }])
+    pushUndo()
     updateActivePlay((p) => ({ ...p, strokes: [], players: [] }))
-  }, [activePlay, updateActivePlay])
+  }, [activePlay, updateActivePlay, pushUndo])
+
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.player-context-menu')) {
+        setSelectedPlayerId(null)
+        setContextMenuPos(null)
+      }
+    }
+    if (selectedPlayerId) {
+      window.addEventListener('mousedown', handleClickOutside)
+      return () => window.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [selectedPlayerId])
+
+  const handlePlayerClick = useCallback(
+    (playerId: string, screenX: number, screenY: number) => {
+      setSelectedPlayerId(playerId)
+      setContextMenuPos({ x: screenX, y: screenY })
+    },
+    []
+  )
+
+  const handlePlayerUpdate = useCallback(
+    (playerId: string, updates: Partial<Player>) => {
+      if (!activePlay) return
+      pushUndo()
+      updateActivePlay((p) => ({
+        ...p,
+        players: p.players.map((pl) => (pl.id === playerId ? { ...pl, ...updates } : pl)),
+      }))
+    },
+    [activePlay, updateActivePlay, pushUndo]
+  )
+
+  const handleStrokeUpdate = useCallback(
+    (strokeId: string, updates: Partial<Stroke>) => {
+      if (!activePlay) return
+      updateActivePlay((p) => ({
+        ...p,
+        strokes: p.strokes.map((s) => (s.id === strokeId ? { ...s, ...updates } : s)),
+      }))
+    },
+    [activePlay, updateActivePlay]
+  )
+
+  const handlePlayerMove = useCallback(
+    (playerId: string, x: number, y: number) => {
+      setPlays((prev) => {
+        const next = prev.map((p) =>
+          p.id === activePlayId
+            ? { ...p, players: p.players.map((pl) => (pl.id === playerId ? { ...pl, x, y } : pl)) }
+            : p
+        )
+        savePlays(next)
+        return next
+      })
+    },
+    [activePlayId]
+  )
+
+  const handleSnapMarkerPlace = useCallback(
+    (player: Player) => {
+      if (!activePlay) return
+      pushUndo()
+      updateActivePlay((p) => ({ ...p, players: [...p.players, player] }))
+    },
+    [activePlay, updateActivePlay, pushUndo]
+  )
+
+  const handleNotesChange = useCallback(
+    (notes: string) => {
+      updateActivePlay((p) => ({ ...p, notes }))
+    },
+    [updateActivePlay]
+  )
+
+  const handleUpdateFormation = useCallback(
+    (formation: string) => {
+      updateActivePlay((p) => ({ ...p, formation }))
+    },
+    [updateActivePlay]
+  )
+
+  const handleUpdateSituation = useCallback(
+    (situation: string) => {
+      updateActivePlay((p) => ({ ...p, situation }))
+    },
+    [updateActivePlay]
+  )
+
+  const handleStickyNoteAdd = useCallback(
+    (note: StickyNote) => {
+      if (!activePlay) return
+      updateActivePlay((p) => ({ ...p, stickyNotes: [...(p.stickyNotes || []), note] }))
+    },
+    [activePlay, updateActivePlay]
+  )
+
+  const handleStickyNoteUpdate = useCallback(
+    (id: string, updates: Partial<StickyNote>) => {
+      if (!activePlay) return
+      updateActivePlay((p) => ({
+        ...p,
+        stickyNotes: (p.stickyNotes || []).map((n) => (n.id === id ? { ...n, ...updates } : n)),
+      }))
+    },
+    [activePlay, updateActivePlay]
+  )
+
+  const handleStickyNoteDelete = useCallback(
+    (id: string) => {
+      if (!activePlay) return
+      updateActivePlay((p) => ({ ...p, stickyNotes: (p.stickyNotes || []).filter((n) => n.id !== id) }))
+    },
+    [activePlay, updateActivePlay]
+  )
+
+  const handleStickyNoteMove = useCallback(
+    (id: string, x: number, y: number) => {
+      setPlays((prev) => {
+        const next = prev.map((p) =>
+          p.id === activePlayId
+            ? { ...p, stickyNotes: (p.stickyNotes || []).map((n) => (n.id === id ? { ...n, x, y } : n)) }
+            : p
+        )
+        savePlays(next)
+        return next
+      })
+    },
+    [activePlayId]
+  )
 
   const handleCreatePlay = useCallback(() => {
     if (plays.length >= MAX_PLAYS) return
@@ -131,7 +267,6 @@ export default function App() {
 
   const handleExport = useCallback(async () => {
     if (!activePlay) return
-    // Find the canvas element
     const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
     if (!canvas) return
     setExporting(true)
@@ -147,207 +282,193 @@ export default function App() {
     setUndoStack([])
   }
 
-  const slotsLeft = MAX_PLAYS - plays.length
-  const canAddPlay = plays.length < MAX_PLAYS
+  const handleEraseItem = (id: string, type: 'stroke' | 'player') => {
+    if (type === 'stroke') handleEraseStroke(id)
+    else handleErasePlayer(id)
+    setSelectedEraseItems((prev) => { const next = new Set(prev); next.delete(id); return next })
+  }
+
+  const toggleEraseItemSelection = (id: string) => {
+    setSelectedEraseItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAllEraseItems = () => {
+    if (!activePlay) return
+    const allIds = new Set<string>()
+    activePlay.strokes.forEach((s) => allIds.add(s.id))
+    activePlay.players.forEach((p) => allIds.add(p.id))
+    setSelectedEraseItems(allIds)
+  }
+
+  const deleteSelectedItems = useCallback(() => {
+    if (!activePlay) return
+    pushUndo()
+    updateActivePlay((p) => ({
+      ...p,
+      strokes: p.strokes.filter((s) => !selectedEraseItems.has(s.id)),
+      players: p.players.filter((pl) => !selectedEraseItems.has(pl.id)),
+    }))
+    setSelectedEraseItems(new Set())
+  }, [activePlay, pushUndo, updateActivePlay, selectedEraseItems])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+        return
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedPlayerId(null)
+        setContextMenuPos(null)
+        return
+      }
+
+      if (isTyping) return
+
+      // Tool shortcuts
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+        switch (e.key.toLowerCase()) {
+          case 's': setTool('select'); return
+          case 'd': setTool('draw'); return
+          case 'p': setTool('player'); return
+          case 'n': setTool('note'); return
+          case 'z': setTool('zone'); return
+          case 'e': setTool('erase'); return
+        }
+      }
+
+      // Delete selected
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (selectedPlayerId) {
+          e.preventDefault()
+          handleErasePlayer(selectedPlayerId)
+          setSelectedPlayerId(null)
+          setContextMenuPos(null)
+        } else if (selectedEraseItems.size > 0) {
+          e.preventDefault()
+          deleteSelectedItems()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleUndo, selectedPlayerId, selectedEraseItems, handleErasePlayer, deleteSelectedItems])
+
+  const startEditingPlayName = () => {
+    if (activePlay) {
+      setTempPlayName(activePlay.name)
+      setEditingPlayName(true)
+    }
+  }
+
+  const savePlayName = () => {
+    if (activePlay && tempPlayName.trim()) {
+      updateActivePlay((p) => ({ ...p, name: tempPlayName.trim() }))
+    }
+    setEditingPlayName(false)
+  }
+
+  const selectedPlayer = activePlay?.players.find((p) => p.id === selectedPlayerId) ?? null
+
+  const closeContextMenu = () => {
+    setSelectedPlayerId(null)
+    setContextMenuPos(null)
+  }
 
   return (
     <div className="app">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <span className="logo-mark">▶</span>
-          <div>
-            <div className="logo-title">PLAYBOOK</div>
-            <div className="logo-sub">PROTO</div>
-          </div>
-        </div>
+      <TopBar
+        plays={plays}
+        activePlayId={activePlayId}
+        newPlayName={newPlayName}
+        setNewPlayName={setNewPlayName}
+        showNewPlay={showNewPlay}
+        setShowNewPlay={setShowNewPlay}
+        onCreatePlay={handleCreatePlay}
+        onDeletePlay={handleDeletePlay}
+        onSelectPlay={handleSelectPlay}
+        firstDownYards={firstDownYards}
+        setFirstDownYards={setFirstDownYards}
+      />
+      <div className="app-body">
+      <ToolRail
+        tool={tool}
+        setTool={setTool}
+        onUndo={handleUndo}
+        onClear={handleClear}
+        undoStackLength={undoStack.length}
+        hasActivePlay={activePlay !== null}
+        color={color}
+        setColor={setColor}
+        lineWidth={lineWidth}
+        setLineWidth={setLineWidth}
+        lineStyle={lineStyle}
+        setLineStyle={setLineStyle}
+        noteColor={noteColor}
+        setNoteColor={setNoteColor}
+        activePlay={activePlay}
+        selectedEraseItems={selectedEraseItems}
+        onEraseItem={handleEraseItem}
+        onToggleEraseItem={toggleEraseItemSelection}
+        onSelectAllEraseItems={selectAllEraseItems}
+        onDeleteSelectedItems={deleteSelectedItems}
+      />
 
-        {/* Plays list */}
-        <div className="plays-section">
-          <div className="section-label">PLAYS <span className="slot-badge">{plays.length}/{MAX_PLAYS}</span></div>
-          <div className="plays-list">
-            {plays.length === 0 && (
-              <div className="empty-plays">No plays yet.<br />Create your first play.</div>
-            )}
-            {plays.map((p) => (
-              <div
-                key={p.id}
-                className={`play-item ${p.id === activePlayId ? 'active' : ''}`}
-                onClick={() => handleSelectPlay(p.id)}
-              >
-                <span className="play-name">{p.name}</span>
-                <button
-                  className="delete-btn"
-                  onClick={(e) => { e.stopPropagation(); handleDeletePlay(p.id) }}
-                  title="Delete play"
-                >✕</button>
-              </div>
-            ))}
-          </div>
+      <Sidebar
+        activePlay={activePlay}
+        onExport={handleExport}
+        exporting={exporting}
+        onUpdateFormation={handleUpdateFormation}
+        onUpdateSituation={handleUpdateSituation}
+      />
 
-          {showNewPlay ? (
-            <div className="new-play-form">
-              <input
-                className="play-name-input"
-                placeholder="Play name..."
-                value={newPlayName}
-                onChange={(e) => setNewPlayName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreatePlay()}
-                autoFocus
-              />
-              <div className="new-play-actions">
-                <button className="btn-confirm" onClick={handleCreatePlay}>CREATE</button>
-                <button className="btn-cancel" onClick={() => setShowNewPlay(false)}>CANCEL</button>
-              </div>
-            </div>
-          ) : (
-            <button
-              className={`btn-new-play ${!canAddPlay ? 'disabled' : ''}`}
-              onClick={() => canAddPlay && setShowNewPlay(true)}
-              disabled={!canAddPlay}
-            >
-              {canAddPlay ? `+ NEW PLAY (${slotsLeft} left)` : '✓ MAX PLAYS REACHED'}
-            </button>
-          )}
-        </div>
-
-        {/* Tools */}
-        {activePlay && (
-          <>
-            <div className="divider" />
-            <div className="tools-section">
-              <div className="section-label">TOOL</div>
-              <div className="tool-grid">
-                {([
-                  { id: 'draw', icon: '✏️', label: 'Route' },
-                  { id: 'arrow', icon: '➤', label: 'Arrow' },
-                  { id: 'player', icon: '◉', label: 'Player' },
-                  { id: 'erase', icon: '⌫', label: 'Erase' },
-                ] as { id: Tool; icon: string; label: string }[]).map((t) => (
-                  <button
-                    key={t.id}
-                    className={`tool-btn ${tool === t.id ? 'active' : ''}`}
-                    onClick={() => setTool(t.id)}
-                  >
-                    <span className="tool-icon">{t.icon}</span>
-                    <span className="tool-label">{t.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Color */}
-            {(tool === 'draw' || tool === 'arrow') && (
-              <>
-                <div className="divider" />
-                <div className="section-label">COLOR</div>
-                <div className="color-row">
-                  {ROUTE_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      className={`color-swatch ${color === c.value ? 'selected' : ''}`}
-                      style={{ background: c.value }}
-                      onClick={() => setColor(c.value)}
-                      title={c.label}
-                    />
-                  ))}
-                </div>
-                <div className="section-label" style={{ marginTop: 10 }}>WEIGHT</div>
-                <div className="width-row">
-                  {[2, 3, 5, 8].map((w) => (
-                    <button
-                      key={w}
-                      className={`width-btn ${lineWidth === w ? 'active' : ''}`}
-                      onClick={() => setLineWidth(w)}
-                    >
-                      <div className="width-preview" style={{ height: w + 1, background: color }} />
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Player config */}
-            {tool === 'player' && (
-              <>
-                <div className="divider" />
-                <div className="section-label">TEAM</div>
-                <div className="team-toggle">
-                  <button
-                    className={`team-btn offense ${playerTeam === 'offense' ? 'active' : ''}`}
-                    onClick={() => setPlayerTeam('offense')}
-                  >⬤ OFF</button>
-                  <button
-                    className={`team-btn defense ${playerTeam === 'defense' ? 'active' : ''}`}
-                    onClick={() => setPlayerTeam('defense')}
-                  >■ DEF</button>
-                </div>
-                <div className="section-label" style={{ marginTop: 10 }}>POSITION</div>
-                <div className="position-grid">
-                  {['QB', 'WR', 'RB', 'TE', 'OL', 'CB', 'LB', 'S', 'DL', 'K'].map((pos) => (
-                    <button
-                      key={pos}
-                      className={`pos-btn ${playerLabel === pos ? 'active' : ''}`}
-                      onClick={() => setPlayerLabel(pos)}
-                    >{pos}</button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="divider" />
-            {/* Actions */}
-            <div className="actions-section">
-              <button className="btn-action" onClick={handleUndo} disabled={undoStack.length === 0}>
-                ↩ UNDO
-              </button>
-              <button className="btn-action danger" onClick={handleClear}>
-                ⊘ CLEAR
-              </button>
-            </div>
-
-            <div className="export-section">
-              <button className="btn-export" onClick={handleExport} disabled={exporting}>
-                {exporting ? 'EXPORTING...' : '↓ EXPORT PDF'}
-              </button>
-            </div>
-          </>
-        )}
-
-        <div className="sidebar-footer">
-          <div className="footer-text">Prototype for FieldIQ</div>
-        </div>
-      </aside>
-
-      {/* Main canvas area */}
-      <main className="canvas-area">
+      <main className="canvas-area ">
         {activePlay ? (
-          <>
-            <div className="canvas-header">
-              <div className="play-title">{activePlay.name}</div>
-              <div className="canvas-hints">
-                {tool === 'draw' && 'Click and drag to draw routes'}
-                {tool === 'arrow' && 'Click and drag to draw directional arrows'}
-                {tool === 'player' && 'Click to place a player on the field'}
-                {tool === 'erase' && 'Click on a route or player to remove it'}
-              </div>
-            </div>
-            <div className="canvas-wrapper">
-              <FieldCanvas
-                strokes={activePlay.strokes}
-                players={activePlay.players}
-                tool={tool}
-                color={color}
-                lineWidth={lineWidth}
-                onStrokeComplete={handleStrokeComplete}
-                onPlayerPlace={handlePlayerPlace}
-                onEraseStroke={handleEraseStroke}
-                onErasePlayer={handleErasePlayer}
-                playerTeam={playerTeam}
-                playerLabel={playerLabel}
-              />
-            </div>
-          </>
+          <CanvasArea
+            activePlay={activePlay}
+            editingPlayName={editingPlayName}
+            tempPlayName={tempPlayName}
+            setTempPlayName={setTempPlayName}
+            onStartEditingPlayName={startEditingPlayName}
+            onSavePlayName={savePlayName}
+            onCancelEditingPlayName={() => setEditingPlayName(false)}
+            tool={tool}
+            color={color}
+            lineWidth={lineWidth}
+            lineStyle={lineStyle}
+            undoStackLength={undoStack.length}
+            onUndo={handleUndo}
+            onClear={handleClear}
+            onStrokeComplete={handleStrokeComplete}
+            onPlayerPlace={handlePlayerPlace}
+            onEraseStroke={handleEraseStroke}
+            onErasePlayer={handleErasePlayer}
+            onSnapMarkerPlace={handleSnapMarkerPlace}
+            onPlayerClick={handlePlayerClick}
+            onPlayerMove={handlePlayerMove}
+            onStrokeUpdate={handleStrokeUpdate}
+            onStickyNoteAdd={handleStickyNoteAdd}
+            onStickyNoteUpdate={handleStickyNoteUpdate}
+            onStickyNoteDelete={handleStickyNoteDelete}
+            onStickyNoteMove={handleStickyNoteMove}
+            playerTeam={playerTeam}
+            playerLabel={playerLabel}
+            playerShape={playerShape}
+            firstDownYards={firstDownYards}
+            noteColor={noteColor}
+            canvasWrapperRef={canvasWrapperRef}
+            onNotesChange={handleNotesChange}
+          />
         ) : (
           <div className="empty-state">
             <div className="empty-icon">◈</div>
@@ -356,6 +477,19 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {selectedPlayer && contextMenuPos && (
+        <PlayerContextMenu
+          selectedPlayer={selectedPlayer}
+          contextMenuPos={contextMenuPos}
+          onClose={closeContextMenu}
+          onChangeLabel={(label) => handlePlayerUpdate(selectedPlayer.id, { label })}
+          onChangeColor={(color) => handlePlayerUpdate(selectedPlayer.id, { color })}
+          onChangeShape={(shape) => handlePlayerUpdate(selectedPlayer.id, { shape })}
+          onDelete={() => { handleErasePlayer(selectedPlayer.id); closeContextMenu() }}
+        />
+      )}
+      </div>
     </div>
   )
 }

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tactical Edge | Playbook Designer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#dee5ff",
+              "on-primary": "#436200",
+              "surface-container": "#0f1930",
+              "on-error": "#450900",
+              "on-error-container": "#ffd2c8",
+              "secondary-container": "#3a485c",
+              "tertiary-container": "#2db7f2",
+              "tertiary-fixed": "#37bcf7",
+              "secondary-dim": "#c7d5ee",
+              "on-secondary-container": "#c3d1ea",
+              "on-tertiary-fixed": "#001a27",
+              "primary-dim": "#bcf063",
+              "primary-container": "#80af27",
+              "error-dim": "#d53d18",
+              "on-primary-fixed-variant": "#496b00",
+              "error": "#ff7351",
+              "on-error-container": "#ffd2c8",
+              "surface-container-lowest": "#000000",
+              "outline-variant": "#40485d",
+              "surface-tint": "#caff6f",
+              "surface-container-highest": "#192540",
+              "on-primary-fixed": "#334c00",
+              "tertiary": "#47c4ff",
+              "surface": "#060e20",
+              "tertiary-fixed-dim": "#1bafe9",
+              "on-primary-container": "#182700",
+              "secondary-fixed-dim": "#c7d5ee",
+              "on-secondary-fixed": "#324054",
+              "surface-bright": "#1f2b49",
+              "inverse-on-surface": "#4d556b",
+              "surface-container-low": "#091328",
+              "surface-dim": "#060e20",
+              "on-tertiary-container": "#003044",
+              "outline": "#6d758c",
+              "surface-container-high": "#141f38",
+              "on-background": "#dee5ff",
+              "on-secondary": "#455367",
+              "inverse-primary": "#486900",
+              "background": "#060e20",
+              "inverse-surface": "#faf8ff",
+              "secondary": "#d5e3fd",
+              "primary-fixed-dim": "#baed60",
+              "on-surface-variant": "#a3aac4",
+              "on-secondary-fixed-variant": "#4e5c71",
+              "primary": "#caff6f",
+              "on-tertiary": "#003b52",
+              "primary-fixed": "#c7fc6d",
+              "secondary-fixed": "#d5e3fd",
+              "surface-variant": "#192540"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .play-canvas {
+        background-image: radial-gradient(#141f38 1px, transparent 1px);
+        background-size: 24px 24px;
+      }
+      .hash-mark {
+        width: 1px;
+        height: 8px;
+        background-color: rgba(222, 229, 255, 0.2);
+      }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-3 bg-[#091328] dark:bg-[#091328] backdrop-blur-xl opacity-90 border-none shadow-none">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-[#DEE5FF] tracking-tighter font-headline">Tactical Edge</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-[#CAFF6F] font-bold border-b-2 border-[#CAFF6F] pb-1 font-['Space_Grotesk'] text-sm uppercase tracking-tight" href="#">My Playbooks</a>
+<a class="text-[#A3AAC4] hover:text-[#DEE5FF] transition-colors font-['Space_Grotesk'] text-sm uppercase tracking-tight" href="#">Varsity Offense</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col items-end mr-4">
+<span class="text-[10px] text-primary uppercase font-bold tracking-widest">Active Play</span>
+<span class="text-sm font-headline font-bold text-on-surface">Red-Right Flare</span>
+</div>
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-[#192540] transition-all duration-200 rounded-lg scale-95 active:scale-90">settings</button>
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-[#192540] transition-all duration-200 rounded-lg scale-95 active:scale-90">help</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Coach Profile" data-alt="professional headshot of a sports coach in a dark polo shirt against a neutral grey background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLjKm47Gxly3zDzj_mGjahMw4nZsxMZStvWnu5FcU9fV5alvvqVjbqrwkPTnIFRH3eJWyh0_Aw42gqQdIdueRLAauStt50l52GXMAQzFxooz8uZqGi7Bt0rfktla7x3UUmXtdQgLQ9SN5e0ww5cbb_bNOpwJaBxEJ0VYPm2UioKaIkTK-awwOEz6OolpqQBzgql3feCmuo7CxmPOyswtSu0wS4Dp3fJO3-mFJFoBuDWEqxtozaVVLMZRfeYrotXCPqb8lewiBxAg"/>
+</div>
+</div>
+</header>
+<main class="relative pt-16 h-screen flex overflow-hidden">
+<!-- SideNavBar (Drawing Tools) -->
+<aside class="fixed left-4 top-24 bottom-24 w-20 rounded-2xl bg-[#091328]/80 dark:bg-[#091328]/80 backdrop-blur-2xl shadow-[0px_20px_40px_rgba(0,0,0,0.4)] flex flex-col items-center py-6 gap-2 z-40">
+<div class="mb-4 flex flex-col items-center">
+<div class="w-10 h-10 bg-surface-container-highest rounded-xl flex items-center justify-center mb-1">
+<span class="material-symbols-outlined text-primary text-xl">edit_square</span>
+</div>
+<span class="font-['Inter'] text-[8px] font-semibold uppercase tracking-widest text-on-surface-variant">v1.2</span>
+</div>
+<button class="flex flex-col items-center justify-center bg-[#CAFF6F]/10 text-[#CAFF6F] border-l-2 border-[#CAFF6F] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all active:shadow-[0_0_15px_rgba(202,255,111,0.2)]">
+<span class="material-symbols-outlined mb-1">near_me</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Select</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#A3AAC4] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all">
+<span class="material-symbols-outlined mb-1">timeline</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Route</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#A3AAC4] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all">
+<span class="material-symbols-outlined mb-1">person_pin</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Player</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#A3AAC4] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all">
+<span class="material-symbols-outlined mb-1">title</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Text</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#A3AAC4] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all">
+<span class="material-symbols-outlined mb-1">texture</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Zone</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#A3AAC4] w-full py-4 hover:text-[#DEE5FF] hover:bg-[#192540]/50 transition-all">
+<span class="material-symbols-outlined mb-1">ink_eraser</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-widest">Eraser</span>
+</button>
+<div class="mt-auto pt-4 flex flex-col items-center gap-4 border-t border-outline-variant/30 w-full">
+<button class="text-[#A3AAC4] hover:text-[#DEE5FF]"><span class="material-symbols-outlined">layers</span></button>
+<button class="text-[#A3AAC4] hover:text-[#DEE5FF]"><span class="material-symbols-outlined">history</span></button>
+</div>
+</aside>
+<!-- Main Workspace (Canvas) -->
+<div class="flex-grow relative overflow-hidden bg-surface-container-low flex items-center justify-center">
+<!-- Football Field Simulation -->
+<div class="relative w-[110%] h-[120%] play-canvas rotate-[-5deg] opacity-40 absolute pointer-events-none"></div>
+<div class="relative w-[90%] max-w-5xl aspect-[16/9] bg-surface rounded-xl overflow-hidden shadow-2xl border border-outline-variant/10">
+<!-- Field Markings -->
+<div class="absolute inset-0 flex flex-col justify-between py-12 px-20">
+<div class="h-px w-full bg-on-surface/20 relative">
+<div class="absolute -left-8 -top-3 text-[10px] font-mono text-on-surface-variant">10</div>
+</div>
+<div class="h-px w-full bg-on-surface/10"></div>
+<div class="h-px w-full bg-on-surface/40 relative">
+<div class="absolute -left-8 -top-3 text-[10px] font-mono text-on-surface">LOS</div>
+</div>
+<div class="h-px w-full bg-on-surface/10"></div>
+<div class="h-px w-full bg-on-surface/20"></div>
+</div>
+<!-- Hash Marks -->
+<div class="absolute inset-0 flex justify-center gap-48 pointer-events-none">
+<div class="flex flex-col justify-between py-12">
+<div class="hash-mark"></div><div class="hash-mark"></div><div class="hash-mark"></div>
+<div class="hash-mark"></div><div class="hash-mark"></div><div class="hash-mark"></div>
+</div>
+<div class="flex flex-col justify-between py-12">
+<div class="hash-mark"></div><div class="hash-mark"></div><div class="hash-mark"></div>
+<div class="hash-mark"></div><div class="hash-mark"></div><div class="hash-mark"></div>
+</div>
+</div>
+<!-- Players & Routes (Simulated UI Elements) -->
+<svg class="absolute inset-0 w-full h-full" viewbox="0 0 800 450">
+<!-- Routes -->
+<path d="M400,280 Q450,220 520,200" fill="none" stroke="#CAFF6F" stroke-dasharray="4 2" stroke-width="2"></path>
+<path d="M520,200 L535,190" fill="none" stroke="#CAFF6F" stroke-width="2"></path>
+<path d="M520,200 L528,212" fill="none" stroke="#CAFF6F" stroke-width="2"></path>
+<path d="M300,280 L300,150 L200,150" fill="none" stroke="#47C4FF" stroke-width="2"></path>
+<path d="M200,150 L212,142" fill="none" stroke="#47C4FF" stroke-width="2"></path>
+<path d="M200,150 L212,158" fill="none" stroke="#47C4FF" stroke-width="2"></path>
+<!-- Offense (Circles) -->
+<g transform="translate(400,280)">
+<circle fill="#060E20" r="14" stroke="#CAFF6F" stroke-width="2"></circle>
+<text fill="#DEE5FF" font-family="Inter" font-size="10" font-weight="bold" text-anchor="middle" y="4">C</text>
+</g>
+<g transform="translate(350,300)">
+<circle fill="#060E20" r="14" stroke="#CAFF6F" stroke-width="2"></circle>
+<text fill="#DEE5FF" font-family="Inter" font-size="10" font-weight="bold" text-anchor="middle" y="4">QB</text>
+</g>
+<g transform="translate(300,280)">
+<circle fill="#060E20" r="14" stroke="#CAFF6F" stroke-width="2"></circle>
+<text fill="#DEE5FF" font-family="Inter" font-size="10" font-weight="bold" text-anchor="middle" y="4">WR</text>
+</g>
+<!-- Defense (Squares) -->
+<g transform="translate(385,185)">
+<rect fill="#060E20" height="28" rx="2" stroke="#D5E3FD" stroke-width="2" width="28" x="0" y="0"></rect>
+<text fill="#D5E3FD" font-family="Inter" font-size="10" font-weight="bold" text-anchor="middle" x="14" y="18">S</text>
+</g>
+<g transform="translate(310,210)">
+<rect fill="#060E20" height="28" rx="2" stroke="#D5E3FD" stroke-width="2" width="28" x="0" y="0"></rect>
+<text fill="#D5E3FD" font-family="Inter" font-size="10" font-weight="bold" text-anchor="middle" x="14" y="18">CB</text>
+</g>
+</svg>
+<!-- Floating Canvas Info -->
+<div class="absolute bottom-4 left-6 flex gap-4">
+<div class="px-3 py-1.5 bg-surface-container-highest/80 backdrop-blur rounded-lg border border-outline-variant/20 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-[10px] font-bold text-on-surface tracking-wider uppercase">Live Edit Mode</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Sidebar (Play Properties & Playbook List) -->
+<aside class="w-80 h-full bg-surface-container/60 backdrop-blur-2xl border-l border-outline-variant/10 flex flex-col z-40">
+<!-- Play Properties Section -->
+<section class="p-6 border-b border-outline-variant/10">
+<h3 class="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-4">Play Properties</h3>
+<div class="space-y-4">
+<div class="flex flex-col gap-1">
+<label class="text-[10px] text-on-surface-variant uppercase font-medium">Formation</label>
+<div class="bg-surface-container-low px-3 py-2 rounded-lg text-sm text-on-surface border border-outline-variant/10">Spread</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-[10px] text-on-surface-variant uppercase font-medium">Situation</label>
+<div class="bg-surface-container-low px-3 py-2 rounded-lg text-sm text-on-surface border border-outline-variant/10">3rd &amp; Long</div>
+</div>
+</div>
+</section>
+<!-- Playbook Explorer -->
+<section class="flex-grow flex flex-col min-h-0">
+<div class="p-6 pb-2 flex justify-between items-center">
+<h3 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em]">Playbook Explorer</h3>
+<span class="text-[10px] text-on-surface-variant">12 Plays</span>
+</div>
+<div class="flex-grow overflow-y-auto px-4 space-y-2 py-2">
+<div class="p-3 bg-surface-container-highest rounded-xl border-l-4 border-primary shadow-lg">
+<div class="text-xs font-bold text-on-surface">Red-Right Flare</div>
+<div class="text-[10px] text-on-surface-variant mt-1">Passing • 5-Wide</div>
+</div>
+<div class="p-3 hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer group">
+<div class="text-xs font-medium text-on-surface-variant group-hover:text-on-surface">Blue ISO Hook</div>
+<div class="text-[10px] text-on-surface-variant/60 mt-1">Passing • Balanced</div>
+</div>
+<div class="p-3 hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer group">
+<div class="text-xs font-medium text-on-surface-variant group-hover:text-on-surface">Gold-Cross Post</div>
+<div class="text-[10px] text-on-surface-variant/60 mt-1">Passing • Vertical</div>
+</div>
+<div class="p-3 hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer group">
+<div class="text-xs font-medium text-on-surface-variant group-hover:text-on-surface">Screen Left Zap</div>
+<div class="text-[10px] text-on-surface-variant/60 mt-1">Run • Motion</div>
+</div>
+<div class="p-3 hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer group">
+<div class="text-xs font-medium text-on-surface-variant group-hover:text-on-surface">Trips Right Streak</div>
+<div class="text-[10px] text-on-surface-variant/60 mt-1">Passing • Aggressive</div>
+</div>
+<div class="p-3 hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer group">
+<div class="text-xs font-medium text-on-surface-variant group-hover:text-on-surface">Bunch Under Out</div>
+<div class="text-[10px] text-on-surface-variant/60 mt-1">Short • Precision</div>
+</div>
+</div>
+</section>
+<!-- Action Area -->
+<section class="p-6 bg-surface-container-high/40">
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(202,255,111,0.2)] hover:shadow-[0_0_30px_rgba(202,255,111,0.3)] transition-all">
+<span class="material-symbols-outlined text-lg">picture_as_pdf</span>
+<span class="uppercase text-xs tracking-widest">Export PDF</span>
+</button>
+<div class="mt-4 flex justify-between gap-2">
+<button class="flex-1 bg-surface-container-highest border border-primary/20 text-on-surface text-[10px] font-bold uppercase py-2 rounded-lg hover:bg-surface-bright transition-colors">Share</button>
+<button class="flex-1 bg-surface-container-highest border border-primary/20 text-on-surface text-[10px] font-bold uppercase py-2 rounded-lg hover:bg-surface-bright transition-colors">Duplicate</button>
+</div>
+</section>
+</aside>
+</main>
+<!-- Contextual FAB (Hidden on this transactional screen as per protocol) -->
+<!-- The FAB is suppressed as this is a task-focused editor workspace -->
+</body></html>

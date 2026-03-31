@@ -5,16 +5,16 @@
 }
 
 :root {
-  --bg: #0a0c0f;
-  --surface: #111418;
-  --surface2: #1a1f26;
-  --border: #252b35;
-  --border2: #2e3642;
-  --accent: #e8ff47;
-  --accent2: #b8cc2a;
-  --text: #f0f4f8;
-  --text2: #8a9ab0;
-  --text3: #4a5568;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --border2: #3d444d;
+  --accent: #caff6f;
+  --accent2: #9ecc3e;
+  --text: #e6edf3;
+  --text2: #7d8590;
+  --text3: #484f58;
   --red: #ff4757;
   --blue: #3d9eff;
   --white: #ffffff;
@@ -39,4 +39,9 @@ button {
 button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
 }
