@@ -11,6 +11,7 @@ interface TopBarProps {
   onCreatePlay: () => void
   onDeletePlay: (id: string) => void
   onSelectPlay: (id: string) => void
+  onRenamePlay: (id: string, name: string) => void
   firstDownYards: number
   setFirstDownYards: (v: number) => void
 }
@@ -20,12 +21,30 @@ type Panel = 'help' | 'account' | null
 export function TopBar({
   plays, activePlayId,
   newPlayName, setNewPlayName, showNewPlay, setShowNewPlay,
-  onCreatePlay, onDeletePlay, onSelectPlay,
+  onCreatePlay, onDeletePlay, onSelectPlay, onRenamePlay,
   firstDownYards, setFirstDownYards,
 }: TopBarProps) {
   const canAddPlay = plays.length < MAX_PLAYS
   const [openPanel, setOpenPanel] = useState<Panel>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  const startRename = (id: string, currentName: string) => {
+    setRenamingId(id)
+    setRenameValue(currentName)
+    setTimeout(() => renameInputRef.current?.select(), 0)
+  }
+
+  const commitRename = () => {
+    if (renamingId && renameValue.trim()) {
+      onRenamePlay(renamingId, renameValue.trim())
+    }
+    setRenamingId(null)
+  }
+
+  const cancelRename = () => setRenamingId(null)
 
   // Preferences state
   const [showPlayerLabels, setShowPlayerLabels] = useState(true)
@@ -54,18 +73,37 @@ export function TopBar({
 
       <nav className="top-bar-nav">
         {plays.map((p) => (
-          <button
+          <div
             key={p.id}
             className={`top-bar-play-tab${p.id === activePlayId ? ' active' : ''}`}
-            onClick={() => onSelectPlay(p.id)}
+            onClick={() => { if (renamingId !== p.id) onSelectPlay(p.id) }}
           >
-            <span className="top-bar-play-tab-name">{p.name}</span>
+            {renamingId === p.id ? (
+              <input
+                ref={renameInputRef}
+                className="top-bar-play-tab-rename-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename() }
+                  if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            ) : (
+              <span
+                className="top-bar-play-tab-name"
+                onDoubleClick={(e) => { e.stopPropagation(); startRename(p.id, p.name) }}
+              >{p.name}</span>
+            )}
             <span
               className="top-bar-play-tab-delete"
               onClick={(e) => { e.stopPropagation(); onDeletePlay(p.id) }}
               title="Delete play"
             >✕</span>
-          </button>
+          </div>
         ))}
 
         {showNewPlay ? (

@@ -20,5 +20,5 @@ export function generateId(): string {
 }
 
 export function newPlay(name: string): Play {
-  return { id: generateId(), name, strokes: [], players: [], stickyNotes: [], notes: '', createdAt: Date.now(), formation: '', situation: '' }
+  return { id: generateId(), name, strokes: [], players: [], stickyNotes: [], zones: [], notes: '', createdAt: Date.now(), formation: '', situation: '' }
 }

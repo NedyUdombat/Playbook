@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import { Tool, LineStyle, Play } from '../types'
+import { Tool, LineStyle, Play, ZoneShape, Zone } from '../types'
 import { ROUTE_COLORS, OFFENSE_ROSTER, DEFENSE_ROSTER } from '../constants'
 
 interface ToolRailProps {
@@ -20,10 +20,14 @@ interface ToolRailProps {
   setNoteColor: (c: string) => void
   activePlay: Play | null
   selectedEraseItems: Set<string>
-  onEraseItem: (id: string, type: 'stroke' | 'player') => void
+  onEraseItem: (id: string, type: 'stroke' | 'player' | 'zone') => void
   onToggleEraseItem: (id: string) => void
   onSelectAllEraseItems: () => void
   onDeleteSelectedItems: () => void
+  zoneShape: ZoneShape
+  setZoneShape: (s: ZoneShape) => void
+  zoneColor: string
+  setZoneColor: (c: string) => void
 }
 
 const RAIL_TOOLS: { id: Tool; icon: string; label: string }[] = [
@@ -35,7 +39,7 @@ const RAIL_TOOLS: { id: Tool; icon: string; label: string }[] = [
   { id: 'erase', icon: 'ink_eraser', label: 'Eraser' },
 ]
 
-const FLYOUT_TOOLS = new Set<Tool>(['draw', 'player', 'note', 'erase'])
+const FLYOUT_TOOLS = new Set<Tool>(['draw', 'player', 'note', 'erase', 'zone'])
 
 export function ToolRail({
   tool, setTool, onUndo, onClear, undoStackLength, hasActivePlay,
@@ -43,6 +47,7 @@ export function ToolRail({
   noteColor, setNoteColor,
   activePlay, selectedEraseItems, onEraseItem, onToggleEraseItem,
   onSelectAllEraseItems, onDeleteSelectedItems,
+  zoneShape, setZoneShape, zoneColor, setZoneColor,
 }: ToolRailProps) {
   const [flyoutTool, setFlyoutTool] = useState<Tool | null>(null)
   const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
@@ -215,11 +220,48 @@ export function ToolRail({
           </>
         )}
 
+        {flyoutTool === 'zone' && (
+          <>
+            <div className="tf-section-label">SHAPE</div>
+            <div className="tf-style-row" style={{ gap: 6 }}>
+              {([
+                { id: 'rectangle' as ZoneShape, label: 'Rect', icon: 'rectangle' },
+                { id: 'circle' as ZoneShape, label: 'Circle', icon: 'circle' },
+                { id: 'triangle' as ZoneShape, label: 'Triangle', icon: 'change_history' },
+              ]).map((s) => (
+                <button
+                  key={s.id}
+                  className={`style-btn ${zoneShape === s.id ? 'active' : ''}`}
+                  onClick={() => setZoneShape(s.id)}
+                  style={{ flexDirection: 'column', gap: 3, minWidth: 48 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{s.icon}</span>
+                  <span style={{ fontSize: 10 }}>{s.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="tf-section-label">COLOR</div>
+            <div className="tf-color-row">
+              {ROUTE_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`color-swatch ${zoneColor === c.value ? 'selected' : ''}`}
+                  style={{ background: c.value }}
+                  onClick={() => setZoneColor(c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+            <div className="roster-hint">Drag on field to draw zone</div>
+          </>
+        )}
+
         {flyoutTool === 'erase' && activePlay && (
           <>
             <div className="tf-section-label">ITEMS ON FIELD</div>
             <div className="tf-erase-list">
-              {activePlay.strokes.length === 0 && activePlay.players.length === 0 && (
+              {activePlay.strokes.length === 0 && activePlay.players.length === 0 && (activePlay.zones || []).length === 0 && (
                 <div className="erase-empty">No items to erase</div>
               )}
               {activePlay.strokes.map((stroke, idx) => (
@@ -253,8 +295,21 @@ export function ToolRail({
                   <button className="erase-item-btn" onClick={() => onEraseItem(player.id, 'player')}>✕</button>
                 </div>
               ))}
+              {(activePlay.zones || []).map((zone: Zone, idx: number) => (
+                <div key={zone.id} className="erase-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedEraseItems.has(zone.id)}
+                    onChange={() => onToggleEraseItem(zone.id)}
+                    className="erase-checkbox"
+                  />
+                  <div className="erase-item-preview" style={{ background: zone.color }} />
+                  <span className="erase-item-label">Zone {idx + 1} ({zone.shape})</span>
+                  <button className="erase-item-btn" onClick={() => onEraseItem(zone.id, 'zone')}>✕</button>
+                </div>
+              ))}
             </div>
-            {(activePlay.strokes.length > 0 || activePlay.players.length > 0) && (
+            {(activePlay.strokes.length > 0 || activePlay.players.length > 0 || (activePlay.zones || []).length > 0) && (
               <div className="erase-actions">
                 <button className="erase-select-all" onClick={onSelectAllEraseItems}>Select All</button>
                 <button

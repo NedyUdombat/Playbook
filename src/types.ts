@@ -1,5 +1,17 @@
 export type Tool = 'draw' | 'arrow' | 'player' | 'erase' | 'note' | 'select' | 'zone'
 
+export type ZoneShape = 'rectangle' | 'circle' | 'triangle'
+
+export interface Zone {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  shape: ZoneShape
+  color: string
+}
+
 export type PlayerTeam = 'offense' | 'defense'
 
 export type PlayerShape = 'circle' | 'triangle' | 'x' | 'square' | 'star'
@@ -42,6 +54,12 @@ export interface Player {
   color?: string // Optional custom color override
 }
 
+export interface ManCoverageLink {
+  id: string
+  defenderId: string
+  receiverId: string
+}
+
 // Sticky note card
 export interface StickyNote {
   id: string
@@ -57,11 +75,13 @@ export interface Play {
   strokes: Stroke[]
   players: Player[]
   stickyNotes: StickyNote[]
+  zones: Zone[]
   notes: string
   createdAt: number
   fieldColor?: string // Custom field background color
   formation?: string
   situation?: string
+  manCoverageLinks?: ManCoverageLink[]
 }
 
 export const MAX_PLAYS = 3

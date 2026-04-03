@@ -1,5 +1,5 @@
 import React from 'react'
-import { Play, Stroke, Player, Tool, LineStyle, PlayerTeam, PlayerShape, StickyNote } from '../types'
+import { Play, Stroke, Player, Tool, LineStyle, PlayerTeam, PlayerShape, StickyNote, Zone, ZoneShape, ManCoverageLink } from '../types'
 import { FieldCanvas } from './FieldCanvas'
 
 interface CanvasAreaProps {
@@ -14,10 +14,14 @@ interface CanvasAreaProps {
   color: string
   lineWidth: number
   lineStyle: LineStyle
+  zoneShape: ZoneShape
+  zoneColor: string
   undoStackLength: number
   onUndo: () => void
   onClear: () => void
   onStrokeComplete: (stroke: Stroke) => void
+  onZoneComplete: (zone: Zone) => void
+  onEraseZone: (id: string) => void
   onPlayerPlace: (player: Player) => void
   onEraseStroke: (id: string) => void
   onErasePlayer: (id: string) => void
@@ -29,6 +33,7 @@ interface CanvasAreaProps {
   onStrokeUpdate?: (strokeId: string, updates: Partial<Stroke>) => void
   noteColor?: string
   onPlayerClick: (playerId: string, screenX: number, screenY: number) => void
+  onZoneClick?: (zoneId: string, screenX: number, screenY: number) => void
   onPlayerMove: (playerId: string, x: number, y: number) => void
   playerTeam: PlayerTeam
   playerLabel: string
@@ -36,21 +41,23 @@ interface CanvasAreaProps {
   firstDownYards: number
   canvasWrapperRef: React.RefObject<HTMLDivElement>
   onNotesChange: (notes: string) => void
+  pendingManCoverageFromId?: string | null
 }
 
 export function CanvasArea({
   activePlay,
   editingPlayName, tempPlayName, setTempPlayName,
   onStartEditingPlayName, onSavePlayName, onCancelEditingPlayName,
-  tool, color, lineWidth, lineStyle,
+  tool, color, lineWidth, lineStyle, zoneShape, zoneColor,
   undoStackLength, onUndo, onClear,
-  onStrokeComplete, onPlayerPlace, onEraseStroke, onErasePlayer,
-  onSnapMarkerPlace, onPlayerClick, onPlayerMove,
+  onStrokeComplete, onZoneComplete, onEraseZone, onPlayerPlace, onEraseStroke, onErasePlayer,
+  onSnapMarkerPlace, onPlayerClick, onPlayerMove, onZoneClick,
   onStickyNoteAdd, onStickyNoteUpdate, onStickyNoteDelete, onStickyNoteMove,
   onStrokeUpdate,
   playerTeam, playerLabel, playerShape, firstDownYards,
   noteColor,
   canvasWrapperRef, onNotesChange,
+  pendingManCoverageFromId,
 }: CanvasAreaProps) {
   return (
     <>
@@ -60,17 +67,23 @@ export function CanvasArea({
             strokes={activePlay.strokes}
             players={activePlay.players}
             stickyNotes={activePlay.stickyNotes}
+            zones={activePlay.zones || []}
             tool={tool}
             color={color}
             lineWidth={lineWidth}
             lineStyle={lineStyle}
+            zoneShape={zoneShape}
+            zoneColor={zoneColor}
             onStrokeComplete={onStrokeComplete}
+            onZoneComplete={onZoneComplete}
+            onEraseZone={onEraseZone}
             onPlayerPlace={onPlayerPlace}
             onEraseStroke={onEraseStroke}
             onErasePlayer={onErasePlayer}
             onSnapMarkerPlace={onSnapMarkerPlace}
             onPlayerClick={onPlayerClick}
             onPlayerMove={onPlayerMove}
+            onZoneClick={onZoneClick}
             onStickyNotePlace={onStickyNoteAdd}
             onStickyNoteUpdate={onStickyNoteUpdate}
             onStickyNoteDelete={onStickyNoteDelete}
@@ -81,6 +94,8 @@ export function CanvasArea({
             playerShape={playerShape}
             firstDownYards={firstDownYards}
             noteColor={noteColor}
+            manCoverageLinks={activePlay.manCoverageLinks || []}
+            pendingManCoverageFromId={pendingManCoverageFromId}
           />
           <div className="notes-section">
             <label className="notes-label">NOTES</label>

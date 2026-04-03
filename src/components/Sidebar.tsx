@@ -56,10 +56,6 @@ export function Sidebar({
         <button className="sb-btn-export" onClick={onExport} disabled={exporting}>
           {exporting ? 'EXPORTING...' : 'EXPORT PDF'}
         </button>
-        <div className="sb-btn-row">
-          <button className="sb-btn-secondary">SHARE</button>
-          <button className="sb-btn-secondary">DUPLICATE</button>
-        </div>
       </div>
 
     </aside>

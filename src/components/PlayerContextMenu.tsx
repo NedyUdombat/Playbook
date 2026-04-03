@@ -10,11 +10,15 @@ interface PlayerContextMenuProps {
   onChangeColor: (color: string | undefined) => void
   onChangeShape: (shape: PlayerShape) => void
   onDelete: () => void
+  linkedToPlayer?: Player | null
+  onAssignMan?: () => void
+  onRemoveMan?: () => void
 }
 
 export function PlayerContextMenu({
   selectedPlayer, contextMenuPos,
   onClose, onChangeLabel, onChangeColor, onChangeShape, onDelete,
+  linkedToPlayer, onAssignMan, onRemoveMan,
 }: PlayerContextMenuProps) {
   const defaultColor = selectedPlayer.team === 'offense' ? '#e8ff47' : '#ff4757'
   const labelOptions = selectedPlayer.team === 'offense'
@@ -109,6 +113,45 @@ export function PlayerContextMenu({
           ))}
         </div>
       </div>
+
+      {(onAssignMan || onRemoveMan) && (
+        <div className="context-menu-section">
+          <div className="context-menu-label">MAN COVERAGE</div>
+          {linkedToPlayer ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: '#a8d8ff', fontWeight: 700, fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.04em' }}>
+                → {linkedToPlayer.label}
+              </span>
+              <button
+                className="context-menu-delete"
+                style={{ marginTop: 0, padding: '2px 8px', fontSize: 11 }}
+                onClick={onRemoveMan}
+              >
+                REMOVE
+              </button>
+            </div>
+          ) : (
+            <button
+              style={{
+                background: 'rgba(168, 216, 255, 0.12)',
+                border: '1px solid rgba(168, 216, 255, 0.4)',
+                borderRadius: 4,
+                color: '#a8d8ff',
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: '"Barlow Condensed", sans-serif',
+                letterSpacing: '0.05em',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                width: '100%',
+              }}
+              onClick={() => { onAssignMan?.(); onClose() }}
+            >
+              ASSIGN MAN
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="context-menu-section">
         <button className="context-menu-delete" onClick={onDelete}>

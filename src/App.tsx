@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CanvasArea } from "./components/CanvasArea";
+import { EmptyState } from "./components/EmptyState";
 import { getFieldDimensions } from "./components/FieldCanvas";
 import { PlayerContextMenu } from "./components/PlayerContextMenu";
+import { ZoneContextMenu } from "./components/ZoneContextMenu";
 import { Sidebar } from "./components/Sidebar";
 import { ToolRail } from "./components/ToolRail";
 import { TopBar } from "./components/TopBar";
@@ -17,6 +19,8 @@ import {
 	type StickyNote,
 	type Stroke,
 	type Tool,
+	type Zone,
+	type ZoneShape,
 } from "./types";
 import { exportPlayToPDF } from "./utils/exportPDF";
 import "./App.css";
@@ -36,17 +40,26 @@ export default function App() {
 	const [showNewPlay, setShowNewPlay] = useState(false);
 	const [exporting, setExporting] = useState(false);
 	const [undoStack, setUndoStack] = useState<
-		{ strokes: Stroke[]; players: Player[] }[]
+		{ strokes: Stroke[]; players: Player[]; zones: Zone[] }[]
 	>([]);
 	const [lineStyle, setLineStyle] = useState<LineStyle>("solid");
 	const [playerShape, setPlayerShape] = useState<PlayerShape>("square");
 	const [firstDownYards, setFirstDownYards] = useState(15);
 	const [noteColor, setNoteColor] = useState("yellow");
+	const [zoneShape, setZoneShape] = useState<ZoneShape>("rectangle");
+	const [zoneColor, setZoneColor] = useState("#e8ff47");
 	const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 	const [contextMenuPos, setContextMenuPos] = useState<{
 		x: number;
 		y: number;
 	} | null>(null);
+	const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+	const [zoneContextMenuPos, setZoneContextMenuPos] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
+	const [pendingManCoverageFromId, setPendingManCoverageFromId] = useState<string | null>(null);
+	const pendingManCoverageFromIdRef = useRef<string | null>(null);
 	const [editingPlayName, setEditingPlayName] = useState(false);
 	const [tempPlayName, setTempPlayName] = useState("");
 	const [selectedEraseItems, setSelectedEraseItems] = useState<Set<string>>(
@@ -76,7 +89,7 @@ export default function App() {
 		if (!activePlay) return;
 		setUndoStack((s) => [
 			...s.slice(-20),
-			{ strokes: activePlay.strokes, players: activePlay.players },
+			{ strokes: activePlay.strokes, players: activePlay.players, zones: activePlay.zones || [] },
 		]);
 	}, [activePlay]);
 
@@ -88,6 +101,48 @@ export default function App() {
 		},
 		[activePlay, updateActivePlay, pushUndo],
 	);
+
+	const handleZoneComplete = useCallback(
+		(zone: Zone) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({ ...p, zones: [...(p.zones || []), zone] }));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
+
+	const handleEraseZone = useCallback(
+		(id: string) => {
+			if (!activePlay) return;
+			pushUndo();
+			updateActivePlay((p) => ({ ...p, zones: (p.zones || []).filter((z) => z.id !== id) }));
+		},
+		[activePlay, updateActivePlay, pushUndo],
+	);
+
+	const handleZoneClick = useCallback(
+		(zoneId: string, screenX: number, screenY: number) => {
+			setSelectedZoneId(zoneId);
+			setZoneContextMenuPos({ x: screenX, y: screenY });
+		},
+		[],
+	);
+
+	const handleZoneUpdate = useCallback(
+		(zoneId: string, updates: Partial<Zone>) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				zones: (p.zones || []).map((z) => z.id === zoneId ? { ...z, ...updates } : z),
+			}));
+		},
+		[activePlay, updateActivePlay],
+	);
+
+	const closeZoneContextMenu = () => {
+		setSelectedZoneId(null);
+		setZoneContextMenuPos(null);
+	};
 
 	const handlePlayerPlace = useCallback(
 		(player: Player) => {
@@ -130,13 +185,14 @@ export default function App() {
 			...p,
 			strokes: prev.strokes,
 			players: prev.players,
+			zones: prev.zones,
 		}));
 	}, [undoStack, activePlay, updateActivePlay]);
 
 	const handleClear = useCallback(() => {
 		if (!activePlay) return;
 		pushUndo();
-		updateActivePlay((p) => ({ ...p, strokes: [], players: [] }));
+		updateActivePlay((p) => ({ ...p, strokes: [], players: [], zones: [] }));
 	}, [activePlay, updateActivePlay, pushUndo]);
 
 	useEffect(() => {
@@ -145,20 +201,47 @@ export default function App() {
 			if (!target.closest(".player-context-menu")) {
 				setSelectedPlayerId(null);
 				setContextMenuPos(null);
+				setSelectedZoneId(null);
+				setZoneContextMenuPos(null);
 			}
 		};
-		if (selectedPlayerId) {
+		if (selectedPlayerId || selectedZoneId) {
 			window.addEventListener("mousedown", handleClickOutside);
 			return () => window.removeEventListener("mousedown", handleClickOutside);
 		}
-	}, [selectedPlayerId]);
+	}, [selectedPlayerId, selectedZoneId]);
 
 	const handlePlayerClick = useCallback(
 		(playerId: string, screenX: number, screenY: number) => {
+			const fromId = pendingManCoverageFromIdRef.current;
+			if (fromId) {
+				if (playerId !== fromId) {
+					setPlays((prev) => {
+						const next = prev.map((p) =>
+							p.id === activePlayId
+								? {
+										...p,
+										manCoverageLinks: [
+											...(p.manCoverageLinks || []).filter(
+												(l) => l.defenderId !== fromId
+											),
+											{ id: `man_${Date.now()}`, defenderId: fromId, receiverId: playerId },
+										],
+									}
+								: p,
+						);
+						savePlays(next);
+						return next;
+					});
+				}
+				pendingManCoverageFromIdRef.current = null;
+				setPendingManCoverageFromId(null);
+				return;
+			}
 			setSelectedPlayerId(playerId);
 			setContextMenuPos({ x: screenX, y: screenY });
 		},
-		[],
+		[activePlayId],
 	);
 
 	const handlePlayerUpdate = useCallback(
@@ -173,6 +256,19 @@ export default function App() {
 			}));
 		},
 		[activePlay, updateActivePlay, pushUndo],
+	);
+
+	const handleRemoveManCoverageLink = useCallback(
+		(defenderId: string) => {
+			if (!activePlay) return;
+			updateActivePlay((p) => ({
+				...p,
+				manCoverageLinks: (p.manCoverageLinks || []).filter(
+					(l) => l.defenderId !== defenderId
+				),
+			}));
+		},
+		[activePlay, updateActivePlay],
 	);
 
 	const handleStrokeUpdate = useCallback(
@@ -333,9 +429,10 @@ export default function App() {
 		setUndoStack([]);
 	};
 
-	const handleEraseItem = (id: string, type: "stroke" | "player") => {
+	const handleEraseItem = (id: string, type: "stroke" | "player" | "zone") => {
 		if (type === "stroke") handleEraseStroke(id);
-		else handleErasePlayer(id);
+		else if (type === "player") handleErasePlayer(id);
+		else handleEraseZone(id);
 		setSelectedEraseItems((prev) => {
 			const next = new Set(prev);
 			next.delete(id);
@@ -357,6 +454,7 @@ export default function App() {
 		const allIds = new Set<string>();
 		activePlay.strokes.forEach((s) => allIds.add(s.id));
 		activePlay.players.forEach((p) => allIds.add(p.id));
+		(activePlay.zones || []).forEach((z) => allIds.add(z.id));
 		setSelectedEraseItems(allIds);
 	};
 
@@ -367,6 +465,7 @@ export default function App() {
 			...p,
 			strokes: p.strokes.filter((s) => !selectedEraseItems.has(s.id)),
 			players: p.players.filter((pl) => !selectedEraseItems.has(pl.id)),
+			zones: (p.zones || []).filter((z) => !selectedEraseItems.has(z.id)),
 		}));
 		setSelectedEraseItems(new Set());
 	}, [activePlay, pushUndo, updateActivePlay, selectedEraseItems]);
@@ -388,6 +487,10 @@ export default function App() {
 			if (e.key === "Escape") {
 				setSelectedPlayerId(null);
 				setContextMenuPos(null);
+				setSelectedZoneId(null);
+				setZoneContextMenuPos(null);
+				pendingManCoverageFromIdRef.current = null;
+				setPendingManCoverageFromId(null);
 				return;
 			}
 
@@ -474,6 +577,13 @@ export default function App() {
 				onCreatePlay={handleCreatePlay}
 				onDeletePlay={handleDeletePlay}
 				onSelectPlay={handleSelectPlay}
+				onRenamePlay={(id, name) => {
+					setPlays((prev) => {
+						const next = prev.map((p) => p.id === id ? { ...p, name } : p)
+						savePlays(next)
+						return next
+					})
+				}}
 				firstDownYards={firstDownYards}
 				setFirstDownYards={setFirstDownYards}
 			/>
@@ -499,6 +609,10 @@ export default function App() {
 					onToggleEraseItem={toggleEraseItemSelection}
 					onSelectAllEraseItems={selectAllEraseItems}
 					onDeleteSelectedItems={deleteSelectedItems}
+					zoneShape={zoneShape}
+					setZoneShape={setZoneShape}
+					zoneColor={zoneColor}
+					setZoneColor={setZoneColor}
 				/>
 
 				<Sidebar
@@ -523,16 +637,21 @@ export default function App() {
 							color={color}
 							lineWidth={lineWidth}
 							lineStyle={lineStyle}
+							zoneShape={zoneShape}
+							zoneColor={zoneColor}
 							undoStackLength={undoStack.length}
 							onUndo={handleUndo}
 							onClear={handleClear}
 							onStrokeComplete={handleStrokeComplete}
+							onZoneComplete={handleZoneComplete}
+							onEraseZone={handleEraseZone}
 							onPlayerPlace={handlePlayerPlace}
 							onEraseStroke={handleEraseStroke}
 							onErasePlayer={handleErasePlayer}
 							onSnapMarkerPlace={handleSnapMarkerPlace}
 							onPlayerClick={handlePlayerClick}
 							onPlayerMove={handlePlayerMove}
+							onZoneClick={handleZoneClick}
 							onStrokeUpdate={handleStrokeUpdate}
 							onStickyNoteAdd={handleStickyNoteAdd}
 							onStickyNoteUpdate={handleStickyNoteUpdate}
@@ -545,38 +664,68 @@ export default function App() {
 							noteColor={noteColor}
 							canvasWrapperRef={canvasWrapperRef}
 							onNotesChange={handleNotesChange}
+							pendingManCoverageFromId={pendingManCoverageFromId}
 						/>
 					) : (
-						<div className="empty-state">
-							<div className="empty-icon">◈</div>
-							<div className="empty-title">NO PLAY SELECTED</div>
-							<div className="empty-sub">
-								Create a play in the sidebar to get started
-							</div>
-						</div>
+						<EmptyState
+							hasNoPlays={plays.length === 0}
+							onCreatePlay={handleCreatePlay}
+						/>
 					)}
 				</main>
 
-				{selectedPlayer && contextMenuPos && (
-					<PlayerContextMenu
-						selectedPlayer={selectedPlayer}
-						contextMenuPos={contextMenuPos}
-						onClose={closeContextMenu}
-						onChangeLabel={(label) =>
-							handlePlayerUpdate(selectedPlayer.id, { label })
-						}
-						onChangeColor={(color) =>
-							handlePlayerUpdate(selectedPlayer.id, { color })
-						}
-						onChangeShape={(shape) =>
-							handlePlayerUpdate(selectedPlayer.id, { shape })
-						}
+				{selectedZoneId && zoneContextMenuPos && activePlay?.zones.find((z) => z.id === selectedZoneId) && (
+					<ZoneContextMenu
+						zone={activePlay.zones.find((z) => z.id === selectedZoneId)!}
+						contextMenuPos={zoneContextMenuPos}
+						onClose={closeZoneContextMenu}
+						onChangeColor={(color) => {
+							handleZoneUpdate(selectedZoneId, { color });
+						}}
 						onDelete={() => {
-							handleErasePlayer(selectedPlayer.id);
-							closeContextMenu();
+							handleEraseZone(selectedZoneId);
+							closeZoneContextMenu();
 						}}
 					/>
 				)}
+				{selectedPlayer && contextMenuPos && (() => {
+					const manLink = activePlay?.manCoverageLinks?.find(
+						(l) => l.defenderId === selectedPlayer.id
+					);
+					const linkedToPlayer = manLink
+						? activePlay?.players.find((p) => p.id === manLink.receiverId)
+						: null;
+					return (
+						<PlayerContextMenu
+							selectedPlayer={selectedPlayer}
+							contextMenuPos={contextMenuPos}
+							onClose={closeContextMenu}
+							onChangeLabel={(label) =>
+								handlePlayerUpdate(selectedPlayer.id, { label })
+							}
+							onChangeColor={(color) =>
+								handlePlayerUpdate(selectedPlayer.id, { color })
+							}
+							onChangeShape={(shape) =>
+								handlePlayerUpdate(selectedPlayer.id, { shape })
+							}
+							onDelete={() => {
+								handleErasePlayer(selectedPlayer.id);
+								closeContextMenu();
+							}}
+							linkedToPlayer={linkedToPlayer ?? null}
+							onAssignMan={() => {
+								pendingManCoverageFromIdRef.current = selectedPlayer.id;
+								setPendingManCoverageFromId(selectedPlayer.id);
+								closeContextMenu();
+							}}
+							onRemoveMan={() => {
+								handleRemoveManCoverageLink(selectedPlayer.id);
+								closeContextMenu();
+							}}
+						/>
+					);
+				})()}
 			</div>
 		</div>
 	);
